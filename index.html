@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Fuga no Amazonas</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app"></div>
+<canvas id="drops"></canvas>
+<div id="vignette"></div>
+
+<div id="hud" class="hidden"><div class="panel">
+  <div class="title">FUGA NO AMAZONAS</div>
+  <div class="phase" id="hudPhase"></div>
+  <div id="bars"></div>
+</div></div>
+<div id="mirror" class="hidden"><span>ATRÁS</span></div>
+<div id="danger" class="hidden">⚠ PERIGO!</div>
+<div id="toast"></div>
+<div id="banner"><div id="banTitle"></div><div id="banSub"></div></div>
+<div id="topbtns">
+  <button id="btnSound" class="sbtn" title="Ligar/desligar som">🔊 Som ON</button>
+  <button id="btnMenu" class="sbtn hidden" title="Voltar ao menu (M)">🏠 Menu</button>
+  <button id="btnPause" class="sbtn hidden" title="Pausar (ESC)">⏸</button>
+</div>
+<div id="touch">
+  <div><button data-k="left">◀</button><button data-k="right">▶</button></div>
+  <div><button data-k="down">▼</button><button data-k="up">▲</button></div>
+</div>
+
+<div id="cineT" class="cine hidden"></div><div id="cineB" class="cine hidden"></div>
+<button id="btnSkip" class="sbtn hidden">Pular introdução ▸</button>
+<div id="fade"></div>
+
+<div id="menu" class="overlay"><div class="card">
+  <h1>🌧️ FUGA NO AMAZONAS 🐊</h1>
+  <p class="tag">“Desça o rio.<br>Não deixe o jacaré alcançar você.”</p>
+  <p class="story">Sua filha está com febre e o remédio só chega pelo rio, até a Vila Boa Esperança. A tempestade fechou a estrada — e um jacaré-açu faminto segue a sua canoa.</p>
+  <div id="lastScore" class="score"><span class="lbl">ÚLTIMA SOBREVIVÊNCIA</span><b id="scoreVal">--:--</b><small id="scoreNote">Ainda sem registro</small></div>
+  <button id="btnStart" class="big">INICIAR</button>
+  <button id="btnHow" class="big alt">COMO JOGAR</button>
+  <div id="how" class="hidden">
+    <b>A história:</b> leve o remédio da sua filha Aninha até a Vila Boa Esperança, rio abaixo, antes que o jacaré alcance você.
+    <ul>
+      <li><b>Fase 1 — A Cheia:</b> troncos, pedras e camalotes (vegetação flutuante) travam o canal.</li>
+      <li><b>Fase 2 — O Banzeiro:</b> ondas fortes jogam a canoa de lado e a sucuri atravessa o rio.</li>
+      <li><b>Fase 3 — A Seca:</b> o rio estreita e surgem bancos de areia onde a canoa encalha.</li>
+      <li><kbd>A</kbd>/<kbd>←</kbd> e <kbd>D</kbd>/<kbd>→</kbd> movem a canoa; <kbd>W</kbd>/<kbd>↑</kbd> acelera; <kbd>S</kbd>/<kbd>↓</kbd> reduz.</li>
+      <li><kbd>ESC</kbd> pausa, <kbd>R</kbd> reinicia, <kbd>M</kbd> volta ao menu.</li>
+      <li>O jacaré vem de trás: veja o quadro <b>ATRÁS</b>. Acelerar gasta o <b>fôlego</b>: alterne remadas fortes e descanso.</li>
+      <li>No celular, use os botões na tela.</li>
+    </ul>
+  </div>
+</div></div>
+
+<div id="pause" class="overlay hidden"><div class="card">
+  <h2>PAUSADO</h2>
+  <p class="tag">A chuva espera por você.</p>
+  <button id="btnResume" class="big">CONTINUAR</button>
+  <button id="btnRestart1" class="big alt">REINICIAR (R)</button>
+  <button id="btnToMenu1" class="big alt">VOLTAR AO MENU</button>
+</div></div>
+
+<div id="end" class="overlay hidden"><div class="card">
+  <h2 id="endTitle"></h2>
+  <p id="endSub"></p>
+  <button id="btnRestart2" class="big">JOGAR NOVAMENTE (R)</button>
+  <button id="btnToMenu2" class="big alt">VOLTAR AO MENU</button>
+</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

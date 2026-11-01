@@ -1,0 +1,72 @@
+:root{--mist:#cfe3d6;--lantern:#e8b04a;--danger:#ff4a3a;--ink:#07100e;--panel:rgba(6,14,12,.58);--line:rgba(190,230,205,.22)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--ink);color:#e9f3e8;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif}
+.hidden{display:none!important}
+#app{position:fixed;inset:0}
+#app canvas{display:block;width:100%;height:100%}
+#drops,#vignette{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+#vignette{background:radial-gradient(ellipse at center,rgba(0,0,0,0) 42%,rgba(200,10,0,.8) 100%);opacity:0}
+
+/* HUD */
+#hud{position:fixed;top:12px;left:12px;pointer-events:none}
+#hud .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px 12px;min-width:270px}
+#hud .title{font:italic 700 15px/1 Georgia,"Palatino Linotype",serif;letter-spacing:.14em;color:var(--lantern);margin-bottom:8px}
+#bars{font:13px/1.55 "Consolas","Courier New",monospace;white-space:pre;color:var(--mist)}
+#bars .warn{color:var(--danger)}
+#bars .tired{color:var(--lantern)}
+#danger{position:fixed;top:12%;left:50%;transform:translateX(-50%);font:900 clamp(26px,5vw,46px)/1 Georgia,serif;color:var(--danger);text-shadow:0 0 18px rgba(255,40,20,.8),0 2px 0 #300;pointer-events:none;animation:pulse .45s infinite alternate}
+@keyframes pulse{from{opacity:.55;transform:translateX(-50%) scale(.97)}to{opacity:1;transform:translateX(-50%) scale(1.04)}}
+#toast{position:fixed;left:50%;bottom:20%;transform:translateX(-50%);padding:9px 18px;background:var(--panel);border:1px solid var(--line);border-radius:999px;font-size:15px;opacity:0;transition:opacity .35s;pointer-events:none;text-align:center;max-width:90vw}
+#toast.on{opacity:1}
+#mirror{position:fixed;top:12px;left:50%;transform:translateX(-50%);width:min(34vw,400px);min-width:210px;aspect-ratio:16/7;border:2px solid var(--line);border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.6),0 6px 24px rgba(0,0,0,.5);pointer-events:none;transition:border-color .2s,box-shadow .2s}
+#mirror.alert{border-color:var(--danger);box-shadow:0 0 18px rgba(255,60,40,.7)}
+#mirror span{position:absolute;left:10px;bottom:6px;font:italic 700 11px Georgia,serif;letter-spacing:.2em;color:rgba(235,245,235,.8);text-shadow:0 1px 3px #000}
+#topbtns{position:fixed;top:12px;right:12px;display:flex;gap:8px;z-index:5}
+button{font-family:inherit;cursor:pointer}
+.sbtn{background:var(--panel);color:var(--mist);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:14px}
+.sbtn:hover,.sbtn:focus-visible{border-color:var(--lantern);outline:none}
+
+/* Touch */
+#touch{position:fixed;left:0;right:0;bottom:max(14px,env(safe-area-inset-bottom));padding:0 16px;justify-content:space-between;pointer-events:none;display:none}
+@media (pointer:coarse){#touch.on{display:flex}}
+#touch div{display:flex;gap:12px;pointer-events:auto}
+#touch button{width:74px;height:74px;border-radius:50%;border:2px solid var(--line);background:rgba(6,14,12,.5);color:var(--mist);font-size:28px;touch-action:none}
+#touch button.d{background:rgba(232,176,74,.4);border-color:var(--lantern)}
+
+/* Overlays */
+.overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:10;padding:16px;
+  background:radial-gradient(ellipse at 50% 40%,rgba(10,22,18,.35),rgba(3,8,7,.88))}
+.card{max-width:560px;width:100%;text-align:center;padding:30px 28px 26px;border-radius:16px;background:rgba(5,12,10,.62);border:1px solid var(--line)}
+.card h1{margin:0 0 10px;font:italic 800 clamp(28px,6vw,46px)/1.05 Georgia,"Palatino Linotype",serif;color:var(--lantern);text-shadow:0 3px 18px rgba(0,0,0,.8)}
+.card p.tag{margin:0 0 22px;font:italic 18px/1.45 Georgia,serif;color:var(--mist)}
+.card h2{margin:0 0 6px;font:italic 800 clamp(30px,7vw,52px)/1.05 Georgia,serif}
+.big{display:block;width:min(100%,300px);margin:10px auto 0;padding:13px 18px;font-size:18px;font-weight:700;letter-spacing:.12em;border-radius:10px;border:2px solid var(--lantern);background:var(--lantern);color:#1a1205}
+.big:hover,.big:focus-visible{filter:brightness(1.12);outline:none}
+.big.alt{background:transparent;color:var(--lantern)}
+#how{margin-top:18px;text-align:left;font-size:14.5px;line-height:1.55;color:var(--mist)}
+#how b{color:var(--lantern)}
+#how ul{margin:6px 0 0;padding-left:20px}
+kbd{display:inline-block;padding:0 6px;border:1px solid var(--line);border-radius:5px;background:rgba(255,255,255,.06);font:12px monospace}
+#end.win h2{color:#8fe3a2}
+#end.lose h2{color:var(--danger)}
+#end p{margin:6px 0 16px;color:var(--mist);font-size:16px}
+.cine{position:fixed;left:0;right:0;height:9vh;background:#000;z-index:4;pointer-events:none}
+#cineT{top:0}#cineB{bottom:0}
+#fade{position:fixed;inset:0;background:#000;z-index:9;pointer-events:none;opacity:0}
+#btnSkip{position:fixed;right:16px;bottom:calc(9vh + 14px);z-index:6}
+.score{margin:0 auto 20px;padding:10px 16px 12px;max-width:300px;border:1px solid var(--line);border-radius:12px;background:rgba(232,176,74,.08)}
+.score .lbl{display:block;font-size:11px;letter-spacing:.22em;color:var(--mist);opacity:.85}
+.score b{display:block;font:800 40px/1.1 Georgia,"Palatino Linotype",serif;color:var(--lantern);margin:4px 0 2px}
+.score small{font-size:13px;color:var(--mist)}
+.score.win b{color:#8fe3a2}.score.lose b{color:#ff8a78}
+@media (max-width:600px){#hud .panel{min-width:0;padding:8px 10px}#bars{font-size:11px}#mirror{top:auto;bottom:max(100px,env(safe-area-inset-bottom));min-width:150px;width:44vw;left:50%}}
+@media (prefers-reduced-motion:reduce){#danger{animation:none}}
+
+/* história, fases e menu */
+.story{margin:-8px auto 18px;max-width:430px;font-size:14px;line-height:1.5;color:var(--mist);opacity:.9}
+#banner{position:fixed;top:26%;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none;opacity:0;z-index:7;width:min(92vw,720px)}
+#banner.on{animation:banner 3.8s ease forwards}
+#banTitle{font:italic 800 clamp(28px,6vw,54px)/1.05 Georgia,"Palatino Linotype",serif;color:var(--lantern);text-shadow:0 3px 18px #000}
+#banSub{margin-top:8px;font-size:clamp(14px,2.4vw,19px);color:var(--mist);text-shadow:0 2px 8px #000}
+@keyframes banner{0%{opacity:0;transform:translateX(-50%) translateY(14px)}12%{opacity:1;transform:translateX(-50%)}80%{opacity:1}100%{opacity:0}}
+#hud .phase{font:700 12px/1.2 "Consolas","Courier New",monospace;letter-spacing:.12em;color:#e9f3e8;margin:-3px 0 7px;opacity:.9}
