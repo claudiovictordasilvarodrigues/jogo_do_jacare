@@ -95,3 +95,8 @@ body.touch .mopts{display:flex}
 @media (pointer:coarse) and (orientation:portrait){#rotateHint{display:block;margin:10px 0 0;font-size:13px;color:var(--lantern)}}
 @media (pointer:coarse){#hud .panel{transform:scale(.86);transform-origin:top left}#toast{bottom:32%;font-size:16px}}
 @media (max-height:520px){.card{padding:14px 18px}.card h1{font-size:26px}.card p.tag{margin-bottom:8px;font-size:15px}.story{display:none}.big{padding:9px 14px;font-size:15px;margin-top:7px}.score{margin-bottom:10px}.score b{font-size:30px}#mirror{min-width:150px;width:26vw}}
+
+/* acabamento gráfico */
+#softVig{position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(0,0,0,.38) 100%)}
+#flashFx{position:fixed;inset:0;pointer-events:none;z-index:3;background:#cfe0ff;opacity:0;mix-blend-mode:screen}
+.gfx{margin:12px auto 0}

@@ -11,6 +11,10 @@ if(typeof THREE==='undefined'){
 const NAV=typeof navigator!=='undefined'?navigator:{};
 const IS_TOUCH=('ontouchstart' in window)||(NAV.maxTouchPoints>0);
 const MOBILE=/Android|iPhone|iPad|iPod/i.test(NAV.userAgent||'')||(IS_TOUCH&&innerWidth<1100);
+const QL=['high','med','low'];
+let quality='high';
+try{const q=localStorage.getItem('fugaAmazonas.q');if(QL.indexOf(q)>=0)quality=q;else if(MOBILE)quality='med';}catch(e){if(MOBILE)quality='med';}
+const QF={low:{pr:0.75,rain:0.5,mist:0,ff:0.4},med:{pr:MOBILE?1:1.25,rain:0.8,mist:1,ff:0.7},high:{pr:MOBILE?1.25:1.5,rain:1,mist:3,ff:1}};
 let hapticsOn=true;
 function buzz(p){if(!IS_TOUCH||!hapticsOn)return;try{if(NAV.vibrate)NAV.vibrate(p);}catch(e){}}
 const CFG={
@@ -22,7 +26,7 @@ const CFG={
   maxGap:110,
   vMin:7, vMax:32, vTired:17,
   drain:0.09, regen:0.12, resumeAt:0.3,
-  forestN:MOBILE?200:300, bushN:MOBILE?110:170, rockN:MOBILE?24:36, logN:MOBILE?24:36, obsN:9,
+  forestN:MOBILE?200:300, palmN:MOBILE?40:80, bushN:MOBILE?110:170, rockN:MOBILE?24:36, logN:MOBILE?24:36, obsN:9,
   rainN:MOBILE?2400:4500, sprayN:MOBILE?300:420,
   fog:0x2a3835
 };
@@ -77,8 +81,8 @@ const kb={left:false,right:false,up:false,down:false}, tc={left:false,right:fals
    SCENE
    ============================================================ */
 const app=$('app');
-const renderer=new THREE.WebGLRenderer({antialias:!MOBILE,powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,MOBILE?1.25:1.5));
+const renderer=new THREE.WebGLRenderer({antialias:!MOBILE&&quality!=='low',powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,QF[quality].pr));
 renderer.setSize(innerWidth,innerHeight);
 renderer.setClearColor(CFG.fog);
 app.appendChild(renderer.domElement);
@@ -111,9 +115,9 @@ float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
   return mix(mix(hash(i),hash(i+vec2(1.0,0.0)),f.x),mix(hash(i+vec2(0.0,1.0)),hash(i+vec2(1.0,1.0)),f.x),f.y);}`;
 const skyMat=new THREE.ShaderMaterial({
   side:THREE.BackSide,depthWrite:false,fog:false,
-  uniforms:{uTime:{value:0},uFlash:{value:0},uHorizon:{value:new THREE.Color(CFG.fog)},uZenith:{value:new THREE.Color(0x0c1412)},uNight:{value:0},uCloud:{value:1}},
+  uniforms:{uTime:{value:0},uFlash:{value:0},uHorizon:{value:new THREE.Color(CFG.fog)},uZenith:{value:new THREE.Color(0x0c1412)},uNight:{value:0},uCloud:{value:1},uWarm:{value:0}},
   vertexShader:`varying vec3 vDir;void main(){vDir=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
-  fragmentShader:`varying vec3 vDir;uniform float uTime,uFlash,uNight,uCloud;uniform vec3 uHorizon,uZenith;
+  fragmentShader:`varying vec3 vDir;uniform float uTime,uFlash,uNight,uCloud,uWarm;uniform vec3 uHorizon,uZenith;
   ${NOISE_GLSL}
   float fbm(vec2 p){float a=0.5,s=0.0;for(int i=0;i<4;i++){s+=a*vnoise(p);p*=2.03;a*=0.5;}return s;}
   void main(){
@@ -127,6 +131,7 @@ const skyMat=new THREE.ShaderMaterial({
     vec2 sg=vec2(atan(d.z,d.x)*40.0,d.y*60.0);
     float st=step(0.985,hash(floor(sg)))*(1.0-smoothstep(0.0,0.35,length(fract(sg)-0.5)));
     col+=vec3(0.8,0.85,1.0)*st*uNight*smoothstep(0.05,0.3,d.y)*(1.0-clamp(c*1.4,0.0,1.0)*uCloud)*1.2;
+    col+=vec3(1.0,0.55,0.25)*pow(max(dot(d,normalize(vec3(0.3,0.08,-1.0))),0.0),6.0)*uWarm*(1.0-0.6*c*uCloud)*0.9;
     float md=dot(d,normalize(vec3(-0.35,0.5,-0.8)));
     col+=vec3(0.75,0.8,0.95)*smoothstep(0.9985,0.9995,md)*uNight*(1.0-0.85*c*uCloud)*1.6;
     col+=vec3(0.2,0.25,0.4)*smoothstep(0.96,0.9985,md)*uNight*(1.0-c*uCloud)*0.5;
@@ -144,7 +149,7 @@ const waterMat=new THREE.ShaderMaterial({
   uniforms:THREE.UniformsUtils.merge([THREE.UniformsLib.fog,{
     uTime:{value:0},uAmp:{value:1},uRain:{value:0.4},uFlash:{value:0},uSpeed:{value:14},
     uSky:{value:new THREE.Color(CFG.fog)},uCanoe:{value:new THREE.Vector2()},uCroc:{value:new THREE.Vector2(0,9999)},uCrocVis:{value:0},
-    uLed:{value:[0,0,0]},uLedN:{value:0},uLamp:{value:new THREE.Vector3()},uLampI:{value:0}
+    uLed:{value:[0,0,0]},uLedN:{value:0},uLamp:{value:new THREE.Vector3()},uLampI:{value:0},uMoon:{value:0}
   }]),
   vertexShader:`
   uniform float uTime,uAmp,uLedN;uniform float uLed[3];varying vec3 vWorld;
@@ -160,7 +165,7 @@ const waterMat=new THREE.ShaderMaterial({
     #include <fog_vertex>
   }`,
   fragmentShader:`
-  uniform float uTime,uAmp,uRain,uFlash,uSpeed,uCrocVis,uLedN,uLampI;uniform float uLed[3];
+  uniform float uTime,uAmp,uRain,uFlash,uSpeed,uCrocVis,uLedN,uLampI,uMoon;uniform float uLed[3];
   uniform vec3 uSky,uLamp;uniform vec2 uCanoe,uCroc;
   varying vec3 vWorld;
   #include <fog_pars_fragment>
@@ -188,6 +193,7 @@ const waterMat=new THREE.ShaderMaterial({
     float r1=vnoise(p*1.7+vec2(0.0,uTime*1.1));
     float r2=vnoise(p*3.9+vec2(uTime*0.7,uTime*0.4));
     grad+=vec2(r1-0.5,r2-0.5)*(0.10+0.16*uRain);
+    grad+=(vec2(vnoise(p*7.0+vec2(uTime*0.8,-uTime*0.5)),vnoise(p*6.0-vec2(uTime*0.6,uTime*0.7)))-0.5)*0.06;
     float ledFoam=0.0;
     for(int i=0;i<3;i++){if(float(i)<uLedN){
       float zl=uLed[i];float t=clamp((zl+7.0-p.y)/14.0,0.0,1.0);
@@ -212,9 +218,9 @@ const waterMat=new THREE.ShaderMaterial({
     float fres=pow(1.0-max(dot(N,V),0.0),3.0);
     vec3 deep=vec3(0.085,0.095,0.06);
     vec3 col=mix(deep,uSky*1.1,0.10+0.85*fres);
-    vec3 Lg=normalize(vec3(-0.35,0.75,0.45));
-    float spec=pow(max(dot(N,normalize(Lg+V)),0.0),70.0);
-    col+=spec*(0.12+uFlash*1.2);
+    vec3 Lg=normalize(vec3(-0.35,0.55,-0.8));
+    float nh=max(dot(N,normalize(Lg+V)),0.0);
+    col+=pow(nh,45.0)*(0.12+uFlash*1.2+uMoon*1.6)+pow(nh,10.0)*0.12*uMoon;
     float fs=vnoise(vec2(p.x*0.7,p.y*0.16));
     float foam=smoothstep(0.66,0.88,fs)*vnoise(p*2.3)*0.35;
     float kk=clamp(uSpeed/20.0,0.35,1.5);
@@ -380,9 +386,42 @@ function makeInst(geo,count){const m=new THREE.InstancedMesh(geo,lamb,count);m.f
 const vineGeo=new THREE.CylinderGeometry(0.05,0.05,1,3);vineGeo.translate(0,-0.5,0);
 const trunkGeo=new THREE.CylinderGeometry(0.45,0.8,1,6);trunkGeo.translate(0,0.5,0);
 const logGeo=new THREE.CylinderGeometry(0.4,0.46,1,6);logGeo.rotateX(Math.PI/2);
-const trunks=makeInst(trunkGeo,CFG.forestN),crowns=makeInst(new THREE.IcosahedronGeometry(1,1),CFG.forestN*2),vines=makeInst(vineGeo,CFG.forestN*2);
+const trunks=makeInst(trunkGeo,CFG.forestN),crowns=makeInst(new THREE.IcosahedronGeometry(1,1),CFG.forestN*3),vines=makeInst(vineGeo,CFG.forestN*2);
 const bushes=makeInst(new THREE.IcosahedronGeometry(1,0),CFG.bushN),rocks=makeInst(new THREE.DodecahedronGeometry(1,0),CFG.rockN),shoreLogs=makeInst(logGeo,CFG.logN);
-const treeZ=new Float32Array(CFG.forestN),bushZ=new Float32Array(CFG.bushN),rockZ=new Float32Array(CFG.rockN),logZ=new Float32Array(CFG.logN),treeX=new Float32Array(CFG.forestN),bushX=new Float32Array(CFG.bushN),rockX=new Float32Array(CFG.rockN),logX=new Float32Array(CFG.logN);
+function mergeGeos(list){ // junta geometrias simples em uma só (com cor por vértice)
+  const pos=[],nor=[],col=[],idx=[];let off=0;
+  for(const it of list){
+    const g=it.g,p=g.attributes.position,n=g.attributes.normal;
+    for(let i=0;i<p.count;i++){pos.push(p.getX(i),p.getY(i),p.getZ(i));nor.push(n.getX(i),n.getY(i),n.getZ(i));col.push(it.c[0],it.c[1],it.c[2]);}
+    if(g.index)for(let i=0;i<g.index.count;i++)idx.push(g.index.getX(i)+off);else for(let i=0;i<p.count;i++)idx.push(i+off);
+    off+=p.count;
+  }
+  const m=new THREE.BufferGeometry();
+  m.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));m.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));
+  m.setAttribute('color',new THREE.Float32BufferAttribute(col,3));m.setIndex(idx);return m;
+}
+const palmGeo=(function(){
+  const list=[];
+  const tr=new THREE.CylinderGeometry(0.16,0.26,11,6);tr.translate(0,5.5,0);list.push({g:tr,c:[0.28,0.2,0.13]});
+  for(let i=0;i<9;i++){                       // 9 folhas achatadas e caídas
+    const g=new THREE.ConeGeometry(0.4,4.6,4);
+    g.applyMatrix4(new THREE.Matrix4().makeTranslation(0,11,0)
+      .multiply(new THREE.Matrix4().makeRotationY(i*0.698+(i%2)*0.2))
+      .multiply(new THREE.Matrix4().makeRotationX(1.7+(i%3)*0.12))
+      .multiply(new THREE.Matrix4().makeTranslation(0,2.3,0))
+      .multiply(new THREE.Matrix4().makeScale(1,1,0.18)));
+    list.push({g,c:[0.16+(i%2)*0.04,0.34,0.12]});
+  }
+  return mergeGeos(list);
+})();
+const palms=new THREE.InstancedMesh(palmGeo,new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide}),CFG.palmN);
+palms.frustumCulled=false;palms.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(palms);
+function placePalm(i,z){
+  palmZ[i]=z;const side=sidePick(),dist=rand(0.8,12)+(nearVillage(z)?40:0),x=riverC(z)+side*(riverW(z)/2+dist),sc=rand(0.8,1.3);
+  palmX[i]=x;
+  put(palms,i,x,bankY(dist)-0.2+lvl(z),z,rand(-0.1,0.1),rand(0,6.28),rand(-0.1,0.1),sc,sc,sc,0,0,0.7+rand(0,0.3));
+}
+const treeZ=new Float32Array(CFG.forestN),bushZ=new Float32Array(CFG.bushN),rockZ=new Float32Array(CFG.rockN),logZ=new Float32Array(CFG.logN),treeX=new Float32Array(CFG.forestN),bushX=new Float32Array(CFG.bushN),rockX=new Float32Array(CFG.rockN),logX=new Float32Array(CFG.logN),palmZ=new Float32Array(CFG.palmN),palmX=new Float32Array(CFG.palmN);
 const FOREST_BEHIND=120,FOREST_AHEAD=250,SPAN=FOREST_BEHIND+FOREST_AHEAD;
 const sidePick=()=>Math.random()<0.5?-1:1;
 function put(mesh,i,x,y,z,rx,ry,rz,sx,sy,sz,h,s,l){
@@ -395,8 +434,9 @@ function placeTree(i,z){
   const x=riverC(z)+side*(hw+dist),h=rand(13,24),r=rand(0.9,1.5),y0=bankY(dist)-0.8+lvl(z);treeX[i]=x;
   put(trunks,i,x,y0,z,rand(-.04,.04),rand(0,6.28),rand(-.04,.04),r,h,r,0.075+rand(0,0.03),0.22+rand(0,.1),0.12+rand(0,.07));
   const cs=rand(4.5,8),cy=rand(2.4,3.6);
-  put(crowns,2*i,x,y0+h,z,0,rand(0,6.28),0,cs,cy,cs*rand(.85,1.15),0.26+rand(0,.06),0.38+rand(0,.2),0.10+rand(0,.08));
-  put(crowns,2*i+1,x+rand(-3,3),y0+h-rand(1,4),z+rand(-3,3),0,rand(0,6.28),0,cs*.7,cy*.8,cs*.7,0.27+rand(0,.06),0.4+rand(0,.2),0.09+rand(0,.08));
+  put(crowns,3*i,x,y0+h,z,0,rand(0,6.28),0,cs,cy,cs*rand(.85,1.15),0.26+rand(0,.06),0.38+rand(0,.2),0.10+rand(0,.08));
+  put(crowns,3*i+1,x+rand(-3,3),y0+h-rand(1,4),z+rand(-3,3),0,rand(0,6.28),0,cs*.7,cy*.8,cs*.7,0.27+rand(0,.06),0.4+rand(0,.2),0.09+rand(0,.08));
+  put(crowns,3*i+2,x+rand(-4,4),y0+h+rand(0.5,2),z+rand(-3,3),0,rand(0,6.28),0,cs*.6,cy*.9,cs*.6,0.28+rand(0,.06),0.45+rand(0,.2),0.14+rand(0,.08));
   for(let k=0;k<2;k++)put(vines,2*i+k,x-side*rand(0.5,cs*0.8),y0+h-cy*0.4,z+rand(-cs,cs)*0.6,0,0,0,1,rand(4,11),1,0.25,0.4,0.12);
 }
 function placeBush(i,z){
@@ -411,13 +451,14 @@ function placeLog(i,z){
   logZ[i]=z;const side=sidePick(),dist=rand(0,5)+(nearVillage(z)?40:0),x=riverC(z)+side*(riverW(z)/2+dist);logX[i]=x;
   put(shoreLogs,i,x,bankY(dist)+0.2+lvl(z),z,0,rand(-0.4,0.4),0,1,1,rand(4,9),0.07,0.25,0.12+rand(0,.07));
 }
-function flagForest(){for(const m of[trunks,crowns,vines,bushes,rocks,shoreLogs]){m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;}}
+function flagForest(){for(const m of[trunks,crowns,vines,bushes,rocks,shoreLogs,palms]){m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;}}
 function rebuildForest(){
   const z0=P.z+FOREST_BEHIND;
   for(let i=0;i<CFG.forestN;i++)placeTree(i,z0-Math.random()*SPAN);
   for(let i=0;i<CFG.bushN;i++)placeBush(i,z0-Math.random()*SPAN);
   for(let i=0;i<CFG.rockN;i++)placeRock(i,z0-Math.random()*SPAN);
   for(let i=0;i<CFG.logN;i++)placeLog(i,z0-Math.random()*SPAN);
+  for(let i=0;i<CFG.palmN;i++)placePalm(i,z0-Math.random()*SPAN);
   flagForest();
 }
 rebuildForest();
@@ -427,6 +468,7 @@ function updateForest(){
   for(let i=0;i<CFG.bushN;i++)if(bushZ[i]>lim){placeBush(i,bushZ[i]-SPAN);dirty=true;}
   for(let i=0;i<CFG.rockN;i++)if(rockZ[i]>lim){placeRock(i,rockZ[i]-SPAN);dirty=true;}
   for(let i=0;i<CFG.logN;i++)if(logZ[i]>lim){placeLog(i,logZ[i]-SPAN);dirty=true;}
+  for(let i=0;i<CFG.palmN;i++)if(palmZ[i]>lim){placePalm(i,palmZ[i]-SPAN);dirty=true;}
   if(dirty)flagForest();
 }
 
@@ -833,6 +875,7 @@ function clearCorridor(zc,side){
   for(let i=0;i<CFG.bushN;i++)if(hit(bushX[i],bushZ[i]))placeBush(i,bushZ[i]-SPAN);
   for(let i=0;i<CFG.rockN;i++)if(hit(rockX[i],rockZ[i]))placeRock(i,rockZ[i]-SPAN);
   for(let i=0;i<CFG.logN;i++)if(hit(logX[i],logZ[i]))placeLog(i,logZ[i]-SPAN);
+  for(let i=0;i<CFG.palmN;i++)if(hit(palmX[i],palmZ[i]))placePalm(i,palmZ[i]-SPAN);
   flagForest();
 }
 function updateIntro(dt){
@@ -955,6 +998,35 @@ function setRunOrigin(forMenu){
   placeLedgeRocks();placeVillage();
 }
 
+/* Névoa baixa: camadas de bruma que deslizam sobre a água (mais forte no igapó) */
+const MIST=[];
+(function(){
+  for(let i=0;i<3;i++){
+    const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,fog:false,
+      uniforms:{uTime:{value:0},uCol:{value:new THREE.Color(CFG.fog)},uAmt:{value:0.3},uOff:{value:new THREE.Vector2(i*37.1,i*11.7)}},
+      vertexShader:`varying vec2 vW;varying vec3 vP;void main(){vec4 wp=modelMatrix*vec4(position,1.0);vW=wp.xz;vP=wp.xyz;gl_Position=projectionMatrix*viewMatrix*wp;}`,
+      fragmentShader:`uniform float uTime,uAmt;uniform vec3 uCol;uniform vec2 uOff;varying vec2 vW;varying vec3 vP;
+        ${NOISE_GLSL}
+        float fbm3(vec2 p){float a=0.5,s=0.0;for(int i=0;i<3;i++){s+=a*vnoise(p);p*=2.03;a*=0.5;}return s;}
+        void main(){
+          float n=fbm3(vW*0.035+uOff+vec2(uTime*0.02,uTime*0.013));
+          float d=length(cameraPosition-vP);
+          float fade=smoothstep(4.0,25.0,d)*(1.0-smoothstep(120.0,240.0,d));
+          gl_FragColor=vec4(uCol,smoothstep(0.35,0.75,n)*uAmt*fade);
+        }`});
+    const g=new THREE.PlaneGeometry(420,420,1,1);g.rotateX(-Math.PI/2);
+    const m=new THREE.Mesh(g,mat);m.frustumCulled=false;m.renderOrder=1;m.visible=false;scene.add(m);MIST.push(m);
+  }
+})();
+function updateMist(){
+  const base=lvl(P.z),amt=0.2+0.5*env.ig+0.1*env.rain;
+  for(let i=0;i<MIST.length;i++){
+    const m=MIST[i];m.visible=i<QF[quality].mist;if(!m.visible)continue;
+    m.position.set(P.x,base+0.5+i*1.3,P.z);
+    const u=m.material.uniforms;u.uTime.value=T;u.uCol.value.copy(fogTmp).multiplyScalar(1.25);u.uAmt.value=amt*(1-0.25*i);
+  }
+}
+
 /* Vaga-lumes (só de noite) */
 const FF={n:MOBILE?90:160,pts:null,geo:null,mat:null,seed:[]};
 (function(){
@@ -968,8 +1040,9 @@ function updateFireflies(){
   const op=clamp((1-env.dl)*(1-0.5*env.rain)*1.1,0,0.9)*(0.75+0.25*Math.sin(T*5));
   FF.mat.opacity=op;FF.pts.visible=op>0.03;
   if(!FF.pts.visible)return;
-  const pos=FF.geo.attributes.position.array,cz=P.z+40;
-  for(let i=0;i<FF.n;i++){
+  const pos=FF.geo.attributes.position.array,cz=P.z+40,nUse=Math.floor(FF.n*QF[quality].ff);
+  FF.geo.setDrawRange(0,nUse);
+  for(let i=0;i<nUse;i++){
     const s=FF.seed[i],z=s.a*200+200*Math.floor((cz-s.a*200)/200);
     pos[i*3]=riverC(z)+s.side*(riverW(z)/2+0.5+s.b*14)+Math.sin(T*0.7+s.a*20)*1.2;
     pos[i*3+1]=lvl(z)+1.0+s.c*3.5+Math.sin(T*1.1+s.b*30)*0.5;
@@ -1153,7 +1226,14 @@ function toggleFull(){
     try{const o=window.screen&&window.screen.orientation;if(o&&o.lock)o.lock('landscape').catch(()=>{});}catch(e){}
   }else (d.exitFullscreen||d.webkitExitFullscreen||function(){}).call(d);
 }
+function cycleQuality(){
+  quality=QL[(QL.indexOf(quality)+1)%QL.length];
+  try{localStorage.setItem('fugaAmazonas.q',quality);}catch(e){}
+  PERF.pr=Math.min(window.devicePixelRatio||1,QF[quality].pr);renderer.setPixelRatio(PERF.pr);renderer.setSize(innerWidth,innerHeight);
+  syncOpts();
+}
 function syncOpts(){
+  document.querySelectorAll('.m-gfx').forEach(b=>b.textContent='Gráficos: '+({high:'ALTO',med:'MÉDIO',low:'BAIXO'})[quality]);
   document.querySelectorAll('.m-auto').forEach(b=>b.textContent='Remada automática: '+(autoPaddle?'LIGADA':'desligada'));
   document.querySelectorAll('.m-tilt').forEach(b=>b.textContent='Inclinar para virar: '+(tilt.on?'LIGADO':'desligado'));
   $('tUp').classList.toggle('hidden',autoPaddle);
@@ -1161,6 +1241,7 @@ function syncOpts(){
 document.querySelectorAll('.m-auto').forEach(b=>b.onclick=()=>{autoPaddle=!autoPaddle;syncOpts();});
 document.querySelectorAll('.m-tilt').forEach(b=>b.onclick=toggleTilt);
 document.querySelectorAll('.m-full').forEach(b=>b.onclick=toggleFull);
+document.querySelectorAll('.m-gfx').forEach(b=>b.onclick=cycleQuality);
 
 /* ============================================================
    UI
@@ -1501,19 +1582,21 @@ function updateWorldFx(dt){
   fogBase.copy(fogNight).lerp(fogCool,dl).lerp(fogWarm,w);
   fogTmp.copy(fogBase).lerp(fogFlash,f*0.7);scene.fog.color.copy(fogTmp);renderer.setClearColor(fogTmp);
   const su=skyMat.uniforms;
-  su.uHorizon.value.copy(fogTmp);su.uTime.value=T;su.uFlash.value=f;su.uNight.value=1-dl;su.uCloud.value=env.cloud;
+  su.uHorizon.value.copy(fogTmp);su.uTime.value=T;su.uFlash.value=f;su.uNight.value=1-dl;su.uWarm.value=w;su.uCloud.value=env.cloud;
   su.uZenith.value.copy(zenNight).lerp(zenCool,dl).lerp(zenWarm,w);
   hemi.color.copy(hemiNight).lerp(hemiCool,dl).lerp(hemiWarm,w);
   sun.color.copy(sunNight).lerp(sunCool,dl).lerp(sunWarm,w);
   hemi.intensity=lerp(0.42,0.62,dl)+0.2*w+2.2*f;sun.intensity=lerp(0.3,0.55,dl)+0.4*w+1.6*f;
   lamp.intensity=(1-dl)*1.8;
+  $('flashFx').style.opacity=Math.min(0.5,f*0.45);
   const u=waterMat.uniforms;
   u.uTime.value=T;u.uAmp.value=waveAmp();u.uRain.value=rain;u.uFlash.value=f;u.uSky.value.copy(fogTmp);u.uSpeed.value=P.s;
   u.uCanoe.value.set(P.x,P.z);u.uCroc.value.set(C.x,C.z-CROC_TIP);u.uCrocVis.value=C.surf;
   const la=u.uLed.value;for(let i=0;i<3;i++)la[i]=LEDGES[i]!==undefined?LEDGES[i]:0;u.uLedN.value=LEDGES.length;
+  u.uMoon.value=(1-dl)*(1-0.7*Math.min(1,rain));
   u.uLamp.value.set(P.x-Math.sin(P.yaw)*2.2,0,P.z-Math.cos(P.yaw)*2.2);u.uLampI.value=(1-dl)*1.0;
   water.position.set(P.x,0,P.z);
-  const r=rainMat.uniforms;r.uTime.value=T;r.uInt.value=0.18+0.82*rain;r.uWind.value=4+5*rain;r.uBaseY.value=lvl(P.z)-1;
+  const r=rainMat.uniforms;r.uTime.value=T;r.uInt.value=(0.18+0.82*rain)*QF[quality].rain;r.uWind.value=4+5*rain;r.uBaseY.value=lvl(P.z)-1;
   sky.position.copy(camera.position);
   updateSpray(dt);
 }
@@ -1550,6 +1633,7 @@ function update(dt){
   updateLedges(dt);
   updateVillage();
   updateFireflies();
+  updateMist();
   updateForest();
   updateBanks();
   updateLightning(dt);
@@ -1590,7 +1674,7 @@ function render(){
     renderer.setScissorTest(false);renderer.setViewport(0,0,W,H);
   }
 }
-const PERF={acc:0,n:0,pr:Math.min(window.devicePixelRatio||1,MOBILE?1.25:1.5)};
+const PERF={acc:0,n:0,pr:Math.min(window.devicePixelRatio||1,QF[quality].pr)};
 function adaptQuality(dt){ // se o aparelho estiver lento, reduz a resolução aos poucos
   if(T<6||G.state==='menu')return;
   PERF.acc+=dt;PERF.n++;
