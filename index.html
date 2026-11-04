@@ -19,15 +19,15 @@
 <div id="mirror" class="hidden"><span>ATRÁS</span></div>
 <div id="danger" class="hidden">⚠ PERIGO!</div>
 <div id="toast"></div>
-<div id="banner"><div id="banTitle"></div><div id="banSub"></div></div>
+<div id="banner"><div id="banTitle"></div><div id="banSub"></div><div id="banStory"></div></div>
 <div id="topbtns">
   <button id="btnSound" class="sbtn" title="Ligar/desligar som">🔊 Som ON</button>
   <button id="btnMenu" class="sbtn hidden" title="Voltar ao menu (M)">🏠 Menu</button>
   <button id="btnPause" class="sbtn hidden" title="Pausar (ESC)">⏸</button>
 </div>
 <div id="touch">
-  <div><button data-k="left">◀</button><button data-k="right">▶</button></div>
-  <div><button data-k="down">▼</button><button data-k="up">▲</button></div>
+  <div id="stick"><div id="knob"></div><span>◀ VIRAR ▶</span></div>
+  <div id="tbtns"><button data-k="down" id="tDown">FREAR</button><button data-k="up" id="tUp">REMAR</button></div>
 </div>
 
 <div id="cineT" class="cine hidden"></div><div id="cineB" class="cine hidden"></div>
@@ -37,20 +37,27 @@
 <div id="menu" class="overlay"><div class="card">
   <h1>🌧️ FUGA NO AMAZONAS 🐊</h1>
   <p class="tag">“Desça o rio.<br>Não deixe o jacaré alcançar você.”</p>
+  <div class="pbar">Jogador: <b id="pName">—</b> <small id="pId"></small> <button id="btnSwitch" class="sbtn">Trocar</button></div>
   <p class="story">Sua filha está com febre e o remédio só chega pelo rio, até a Vila Boa Esperança. A tempestade fechou a estrada — e um jacaré-açu faminto segue a sua canoa.</p>
-  <div id="lastScore" class="score"><span class="lbl">ÚLTIMA SOBREVIVÊNCIA</span><b id="scoreVal">--:--</b><small id="scoreNote">Ainda sem registro</small></div>
+  <div id="lastScore" class="score"><span class="lbl">ÚLTIMA PONTUAÇÃO</span><b id="scoreVal">--</b><small id="scoreNote">Ainda sem registro</small><br><small id="bestNote"></small></div>
   <button id="btnStart" class="big">INICIAR</button>
   <button id="btnHow" class="big alt">COMO JOGAR</button>
+  <button id="btnRank" class="big alt">RANKING</button>
+  <div class="mopts"><button class="sbtn m-auto"></button><button class="sbtn m-tilt"></button><button class="sbtn m-full">⛶ Tela cheia</button></div>
+  <p id="rotateHint">📱 Dica: gire o celular para a horizontal.</p>
   <div id="how" class="hidden">
-    <b>A história:</b> leve o remédio da sua filha Aninha até a Vila Boa Esperança, rio abaixo, antes que o jacaré alcance você.
+    <b>A história:</b> leve o remédio da sua filha Aninha até a Vila Boa Esperança, rio abaixo, durante uma noite de tempestade — antes que o jacaré alcance você.
     <ul>
-      <li><b>Fase 1 — A Cheia:</b> troncos, pedras e camalotes (vegetação flutuante) travam o canal.</li>
-      <li><b>Fase 2 — O Banzeiro:</b> ondas fortes jogam a canoa de lado e a sucuri atravessa o rio.</li>
-      <li><b>Fase 3 — A Seca:</b> o rio estreita e surgem bancos de areia onde a canoa encalha.</li>
-      <li><kbd>A</kbd>/<kbd>←</kbd> e <kbd>D</kbd>/<kbd>→</kbd> movem a canoa; <kbd>W</kbd>/<kbd>↑</kbd> acelera; <kbd>S</kbd>/<kbd>↓</kbd> reduz.</li>
-      <li><kbd>ESC</kbd> pausa, <kbd>R</kbd> reinicia, <kbd>M</kbd> volta ao menu.</li>
-      <li>O jacaré vem de trás: veja o quadro <b>ATRÁS</b>. Acelerar gasta o <b>fôlego</b>: alterne remadas fortes e descanso.</li>
-      <li>No celular, use os botões na tela.</li>
+      <li><b>1 · A Cheia (tarde):</b> troncos, pedras e camalotes travam o canal.</li>
+      <li><b>2 · O Banzeiro (entardecer):</b> ondas fortes jogam a canoa de lado e a sucuri atravessa o rio.</li>
+      <li><b>3 · A Trilha de Pedras (anoitecer):</b> fileiras de pedras com uma passagem e quedas d’água — fique no centro.</li>
+      <li><b>4 · A Mata Caída (noite):</b> a tempestade derruba árvores sobre o rio; contorne pelo lado livre.</li>
+      <li><b>5 · O Igapó (noite):</b> floresta alagada, troncos em pé e névoa densa. Siga a luz do lampião.</li>
+      <li><b>6 · A Seca (amanhecer):</b> o rio encolheu e surgem bancos de areia.</li>
+      <li>Colete 🫐 <b>açaí</b>: devolve fôlego e vale 50 pontos. Pontos = metros + açaí + bônus de chegada.</li>
+      <li><kbd>A</kbd>/<kbd>←</kbd> e <kbd>D</kbd>/<kbd>→</kbd> viram; <kbd>W</kbd>/<kbd>↑</kbd> acelera; <kbd>S</kbd>/<kbd>↓</kbd> reduz; <kbd>ESC</kbd> pausa; <kbd>R</kbd> reinicia; <kbd>M</kbd> menu.</li>
+      <li><b>Celular:</b> arraste o joystick para virar, FREAR para reduzir. A remada é automática (dá para desligar). Também dá para inclinar o aparelho.</li>
+      <li>O jacaré vem de trás: veja o quadro <b>ATRÁS</b>. Acelerar gasta o <b>fôlego</b>.</li>
     </ul>
   </div>
 </div></div>
@@ -61,13 +68,34 @@
   <button id="btnResume" class="big">CONTINUAR</button>
   <button id="btnRestart1" class="big alt">REINICIAR (R)</button>
   <button id="btnToMenu1" class="big alt">VOLTAR AO MENU</button>
+  <div class="mopts"><button class="sbtn m-auto"></button><button class="sbtn m-tilt"></button></div>
 </div></div>
 
 <div id="end" class="overlay hidden"><div class="card">
   <h2 id="endTitle"></h2>
   <p id="endSub"></p>
+  <div id="endScore"></div>
   <button id="btnRestart2" class="big">JOGAR NOVAMENTE (R)</button>
   <button id="btnToMenu2" class="big alt">VOLTAR AO MENU</button>
+</div></div>
+
+
+<div id="login" class="overlay hidden"><div class="card">
+  <h2 style="font-size:30px;color:var(--lantern)">Quem vai descer o rio?</h2>
+  <p class="tag" style="font-size:15px;margin-bottom:12px">Digite seu nome para salvar sua pontuação. Se o nome já existir neste aparelho, você continua o mesmo perfil.</p>
+  <input id="playerName" maxlength="16" autocomplete="off" placeholder="Seu nome">
+  <div class="chips" id="chips"></div>
+  <button id="btnLogin" class="big">ENTRAR</button>
+  <button id="btnGuest" class="big alt">JOGAR COMO VISITANTE</button>
+  <button id="btnLoginCancel" class="big alt">CANCELAR</button>
+  <p class="hint">O perfil e as pontuações ficam salvos neste aparelho (sem servidor). Um ranking online entre aparelhos exigiria um servidor.</p>
+</div></div>
+
+<div id="rank" class="overlay hidden"><div class="card">
+  <h2 style="font-size:30px;color:var(--lantern)">RANKING</h2>
+  <div id="rankBody"></div>
+  <button id="btnRankClose" class="big">FECHAR</button>
+  <p class="hint">Ranking dos perfis deste aparelho.</p>
 </div></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
