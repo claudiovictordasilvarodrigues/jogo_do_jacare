@@ -24,7 +24,7 @@ const CFG={
   catchDist:4,       // abaixo disso o jacaré pega a canoa
   dangerDist:24,     // abaixo disso começa o perigo
   maxGap:110,
-  vMin:7, vMax:32, vTired:17,
+  vMin:7, vMax:36, vTired:19,
   drain:0.09, regen:0.12, resumeAt:0.3,
   forestN:MOBILE?200:300, palmN:MOBILE?40:80, bushN:MOBILE?110:170, rockN:MOBILE?24:36, logN:MOBILE?24:36, obsN:9,
   rainN:MOBILE?2400:4500, sprayN:MOBILE?300:420,
@@ -44,36 +44,44 @@ const riverC=z=>16*Math.sin(z*0.012)+6*Math.sin(z*0.031+2.0);
 const riverDC=z=>16*0.012*Math.cos(z*0.012)+6*0.031*Math.cos(z*0.031+2.0);
 const riverDDC=z=>-16*0.012*0.012*Math.sin(z*0.012)-6*0.031*0.031*Math.sin(z*0.031+2.0);
 /* Percurso: 6 fases medidas pela distância (um dia que vira noite e amanhece) */
-const COURSE={L:5400,
-  names:['A CHEIA','O BANZEIRO','A TRILHA DE PEDRAS','A MATA CAÍDA','O IGAPÓ','A SECA'],
-  subs:['Troncos e camalotes bloqueiam o canal.','Ondas fortes — e a sucuri está caçando.','Pedras, corredeiras e quedas d’água.','O vento derruba árvores sobre o rio.','Floresta alagada: troncos em pé e névoa densa.','O rio encolheu: bancos de areia.'],
-  story:['Tarde. A chuva engrossou e o rio subiu.','O vento cresceu. O banzeiro vem de lado.','Anoitece. O rio vira uma trilha entre pedras.','Noite fechada. A tempestade derruba a mata.','O igapó engoliu as margens. Siga a luz do lampião.','Amanhece. A vila está perto — o jacaré também.']};
+const COURSE={L:5600,L1:5600,L2:2800,
+  names:['A CHEIA','O ENCONTRO DAS ÁGUAS','O BANZEIRO','A TRILHA DE PEDRAS','A MATA CAÍDA','O IGAPÓ','A SECA','A BUSCA NA ALDEIA','RUMO AO POLO'],
+  subs:['Troncos e camalotes bloqueiam o canal.','Dois rios, duas correntezas: o Negro é lento, o Solimões é rápido e traiçoeiro.','Ondas fortes — e a sucuri está caçando.','Pedras, corredeiras e quedas d’água.','O vento derruba árvores sobre o rio.','Floresta alagada: troncos em pé e névoa densa.','O rio encolheu: bancos de areia.','Siga o rio até a Aldeia Maripá e atraque no píer.','Leve a paciente ao Polo Base — cada batida pesa mais.'],
+  story:['Você é técnico de enfermagem da saúde ribeirinha e indígena. A febre da criança não espera.','O Negro e o Solimões correm lado a lado sem se misturar. Escolha a sua correnteza.','O vento cresceu. O banzeiro vem de lado.','Anoitece. O rio vira uma trilha entre pedras.','Noite fechada. A tempestade derruba a mata.','O igapó engoliu as margens. Siga a luz do lampião.','Amanhece. A comunidade está perto — o jacaré também.','O rádio chamou: uma anciã espera na Aldeia Maripá, e a manhã mal começou.','A paciente precisa de avaliação médica no Polo Base. O jacaré voltou a seguir a canoa.']};
+const PH={CHEIA:0,ENCONTRO:1,BANZEIRO:2,TRILHA:3,MATA:4,IGAPO:5,SECA:6,BUSCA:7,POLO:8};
 let RUN_Z0=0,worldDirty=false,LEDGES=[],LD=[];
 const LEDGE_DROP=3.0,LEDGE_W=14;
 /* nível da água: cada queda d'água rebaixa o rio (usado por tudo que flutua ou apoia na margem) */
 function lvl(z){let y=0;for(let i=0;i<LEDGES.length;i++){const t=clamp((LEDGES[i]+LEDGE_W/2-z)/LEDGE_W,0,1);y-=LEDGE_DROP*t*t*(3-2*t);}return y;}
 const zEnd=()=>RUN_Z0-COURSE.L;
 const progressAt=z=>clamp((RUN_Z0-z)/COURSE.L,0,1);
-const phaseOf=p=>Math.min(5,Math.floor(p*6));
+const phaseOf=p=>G.mission===2?(p<0.5?PH.BUSCA:PH.POLO):Math.min(6,Math.floor(p*7));
+/* Encontro das Águas: faixa do percurso com duas correntezas separadas por uma linha sinuosa */
+const bnd=z=>5*Math.sin(z*0.018+0.7);
+const meetZ=()=>[RUN_Z0-COURSE.L/7,RUN_Z0-COURSE.L*2/7];
+const meetW=z=>{if(!env.run||G.mission===2)return 0;const m=meetZ();return smooth((m[0]-z)/60)*smooth((z-m[1])/60);};
+const laneK=(z,o)=>clamp((o-bnd(z))/3,-1,1);   // -1 = Rio Negro (lento) ... +1 = Solimões (rápido)
 const pw=(x,pts)=>{if(x<=pts[0][0])return pts[0][1];for(let i=1;i<pts.length;i++){if(x<=pts[i][0]){const a=pts[i-1],b=pts[i];return lerp(a[1],b[1],(x-a[0])/(b[0]-a[0]));}}return pts[pts.length-1][1];};
-const RAINK=[[0,.25],[.17,.75],[.33,1],[.5,.8],[.67,1],[.83,.45],[.9,.12],[1,.05]];   // chuva ao longo do percurso
-const DL=[[0,.85],[.17,.75],[.3,.3],[.38,.06],[.5,0],[.8,0],[.9,.2],[1,.6]];         // luz do dia (1 = dia, 0 = noite)
-const WARMK=[[0,0],[.17,.15],[.3,.6],[.38,.15],[.5,0],[.8,0],[.9,.5],[1,1]];          // tom alaranjado (pôr do sol / amanhecer)
-const igapoAt=p=>smooth((p-0.65)/0.03)*(1-smooth((p-0.82)/0.03));
-const dryAt=p=>smooth((p-0.84)/0.08);
-const nearVillage=z=>Math.abs(z-(zEnd()-8))<34;
+const RAINK=[[0,.25],[.14,.6],[.29,.75],[.43,1],[.57,.8],[.71,1],[.86,.45],[.93,.12],[1,.05]];   // chuva ao longo do percurso
+const DL=[[0,.85],[.2,.8],[.3,.65],[.4,.3],[.46,.06],[.55,0],[.84,0],[.92,.2],[1,.6]];         // luz do dia (1 = dia, 0 = noite)
+const WARMK=[[0,0],[.2,.1],[.3,.25],[.4,.6],[.46,.15],[.55,0],[.84,0],[.92,.5],[1,1]];          // tom alaranjado (pôr do sol / amanhecer)
+const RAIN2=[[0,.05],[.5,.1],[.8,.5],[1,.15]],DL2=[[0,.6],[.25,.9],[1,1]],WARM2=[[0,1],[.2,.4],[.4,0],[1,0]];   // manhã da missão 2
+const igapoAt=p=>G.mission===2?0:smooth((p-0.70)/0.03)*(1-smooth((p-0.86)/0.03));
+const dryAt=p=>G.mission===2?0:smooth((p-0.87)/0.08);
+const zAld=()=>RUN_Z0-COURSE.L*0.5;   // aldeia da missão 2
+const nearVillage=z=>Math.abs(z-(zEnd()-8))<34||(G.mission===2&&Math.abs(z-(zAld()-8))<34);
 const riverW=z=>(60+10*Math.sin(z*0.011+1.3))*(1-0.15*igapoAt(progressAt(z)))*(1-0.36*dryAt(progressAt(z)));
-const timeLabel=p=>p<0.25?'TARDE':p<0.38?'ENTARDECER':p<0.85?'NOITE':p<0.95?'MADRUGADA':'AMANHECER';
+const timeLabel=p=>G.mission===2?'MANHÃ':p<0.3?'TARDE':p<0.42?'ENTARDECER':p<0.85?'NOITE':p<0.95?'MADRUGADA':'AMANHECER';
 const waveH=(x,z,t,a)=>a*(0.10*Math.sin(x*0.5+t*1.2)+0.08*Math.sin(z*0.4+t*2.0)+0.05*Math.sin((x+z)*0.9+t*2.6));
 
 /* ============================================================
    GAME STATE
    ============================================================ */
 let T=0; // tempo de animação global
-const G={state:'menu',t:0,ti:0,endDelay:0,evt:0,phase:0,near:false,endP:0,acai:0,finalScore:0,newBest:false};
-const P={z:0,o:0,vo:0,x:riverC(0),s:14,yaw:0,roll:0,pitch:0,waveY:0,stamina:1,exhausted:false,ph:0,hitCD:0,shake:0,kick:0};
+const G={state:'menu',t:0,ti:0,endDelay:0,evt:0,phase:0,near:false,endP:0,acai:0,finalScore:0,newBest:false,mission:1,patient:false,m1done:false,board:null,dock:{t:0,warned:false,missed:0},cause:'croc',lostT:0,poloPlaced:false};
+const P={z:0,o:0,vo:0,x:riverC(0),s:14,yaw:0,roll:0,pitch:0,waveY:0,stamina:1,exhausted:false,ph:0,hitCD:0,shake:0,kick:0,hp:100,inv:0,hurtT:0};
 const C={D:CFG.startGap,o:0,x:0,z:0,yaw:0,surf:0,surfTarget:0,emerged:false,diving:false,diveT:0,nextDive:16,nextSurge:12,surgeT:0,beatT:0,vC:14,prevO:0};
-const env={rain:0.45,flash:0,danger:0,bz:0,warm:0,p:0,dl:0.85,ig:0,cloud:1,fall:0};
+const env={rain:0.45,flash:0,danger:0,bz:0,warm:0,p:0,dl:0.85,ig:0,cloud:1,fall:0,run:false};
 const waveAmp=()=>0.9+0.9*env.rain+1.5*env.bz;
 const kb={left:false,right:false,up:false,down:false}, tc={left:false,right:false,up:false,down:false,axis:0}, inp={left:false,right:false,up:false,down:false,axis:0};
 
@@ -149,23 +157,25 @@ const waterMat=new THREE.ShaderMaterial({
   uniforms:THREE.UniformsUtils.merge([THREE.UniformsLib.fog,{
     uTime:{value:0},uAmp:{value:1},uRain:{value:0.4},uFlash:{value:0},uSpeed:{value:14},
     uSky:{value:new THREE.Color(CFG.fog)},uCanoe:{value:new THREE.Vector2()},uCroc:{value:new THREE.Vector2(0,9999)},uCrocVis:{value:0},
-    uLed:{value:[0,0,0]},uLedN:{value:0},uLamp:{value:new THREE.Vector3()},uLampI:{value:0},uMoon:{value:0}
+    uLed:{value:[0,0,0]},uLedN:{value:0},uLamp:{value:new THREE.Vector3()},uLampI:{value:0},uMoon:{value:0},
+    uWx:{value:[0,0,0]},uWz:{value:[0,0,0]},uWr:{value:[1,1,1]},uMeetA:{value:0},uMeetB:{value:0},uMeetOn:{value:0}
   }]),
   vertexShader:`
-  uniform float uTime,uAmp,uLedN;uniform float uLed[3];varying vec3 vWorld;
+  uniform float uTime,uAmp,uLedN;uniform float uLed[3];uniform float uWx[3],uWz[3],uWr[3];varying vec3 vWorld;
   float lvl(float z){float y=0.0;for(int i=0;i<3;i++){if(float(i)<uLedN){float t=clamp((uLed[i]+7.0-z)/14.0,0.0,1.0);y-=3.0*t*t*(3.0-2.0*t);}}return y;}
   #include <fog_pars_vertex>
   float waveH(vec2 p,float t){return uAmp*(0.10*sin(p.x*0.5+t*1.2)+0.08*sin(p.y*0.4+t*2.0)+0.05*sin((p.x+p.y)*0.9+t*2.6));}
   void main(){
     vec4 wp=modelMatrix*vec4(position,1.0);
     wp.y+=waveH(wp.xz,uTime)+lvl(wp.z);
+    for(int i=0;i<3;i++){float dd=length(wp.xz-vec2(uWx[i],uWz[i]));wp.y-=1.2*exp(-dd*dd/(uWr[i]*uWr[i]*0.6));}
     vWorld=wp.xyz;
     vec4 mvPosition=viewMatrix*wp;
     gl_Position=projectionMatrix*mvPosition;
     #include <fog_vertex>
   }`,
   fragmentShader:`
-  uniform float uTime,uAmp,uRain,uFlash,uSpeed,uCrocVis,uLedN,uLampI,uMoon;uniform float uLed[3];
+  uniform float uTime,uAmp,uRain,uFlash,uSpeed,uCrocVis,uLedN,uLampI,uMoon;uniform float uLed[3];uniform float uWx[3],uWz[3],uWr[3];uniform float uMeetA,uMeetB,uMeetOn;
   uniform vec3 uSky,uLamp;uniform vec2 uCanoe,uCroc;
   varying vec3 vWorld;
   #include <fog_pars_fragment>
@@ -216,8 +226,24 @@ const waterMat=new THREE.ShaderMaterial({
     vec3 N=normalize(vec3(-grad.x,1.0,-grad.y));
     vec3 V=normalize(cameraPosition-vWorld);
     float fres=pow(1.0-max(dot(N,V),0.0),3.0);
-    vec3 deep=vec3(0.085,0.095,0.06);
-    vec3 col=mix(deep,uSky*1.1,0.10+0.85*fres);
+    float mz=clamp((uMeetA-p.y)/60.0,0.0,1.0)*clamp((p.y-uMeetB)/60.0,0.0,1.0);
+    mz=mz*mz*(3.0-2.0*mz)*uMeetOn;
+    float bx=16.0*sin(p.y*0.012)+6.0*sin(p.y*0.031+2.0)+5.0*sin(p.y*0.018+0.7);
+    float sd=p.x-bx+1.8*(vnoise(vec2(p.y*0.35,uTime*0.6))-0.5);
+    float lane=smoothstep(-1.2,1.2,sd);
+    float edgeFoam=(1.0-smoothstep(0.0,2.2,abs(sd)))*mz*(0.5+0.9*vnoise(p*vec2(1.5,3.0)+vec2(0.0,uTime*2.0)));
+    float whF=0.0,whD=0.0;
+    for(int i=0;i<3;i++){
+      vec2 dv=p-vec2(uWx[i],uWz[i]);float rr=length(dv),RR=uWr[i];
+      if(rr<RR*1.7){
+        float an=atan(dv.y,dv.x+0.0001)+RR*1.3/(rr+0.6)-uTime*2.5;
+        whF+=smoothstep(0.55,1.0,sin(an*3.0))*(1.0-smoothstep(RR*0.1,RR*1.6,rr))*0.9;
+        whD+=1.0-smoothstep(0.0,RR*0.6,rr);
+      }
+    }
+    vec3 deep=mix(vec3(0.085,0.095,0.06),mix(vec3(0.022,0.028,0.03),vec3(0.30,0.22,0.12),lane),mz);
+    deep*=1.0-0.5*min(whD,1.0);
+    vec3 col=mix(deep,uSky*1.1,clamp(0.10+0.85*fres+0.18*(1.0-lane)*mz,0.0,1.0));
     vec3 Lg=normalize(vec3(-0.35,0.55,-0.8));
     float nh=max(dot(N,normalize(Lg+V)),0.0);
     col+=pow(nh,45.0)*(0.12+uFlash*1.2+uMoon*1.6)+pow(nh,10.0)*0.12*uMoon;
@@ -226,7 +252,7 @@ const waterMat=new THREE.ShaderMaterial({
     float kk=clamp(uSpeed/20.0,0.35,1.5);
     float wk=wake(p,uCanoe,26.0,0.17,kk)+rings(p,uCanoe,0.35);
     float wc=(wake(p,uCroc,22.0,0.14,1.0)+rings(p,uCroc,0.45))*uCrocVis;
-    float foamAll=foam+wk*0.9+wc*0.9+ring*0.28+ledFoam;
+    float foamAll=foam+wk*0.9+wc*0.9+ring*0.28+ledFoam+edgeFoam*0.9+whF;
     col=mix(col,vec3(0.62,0.68,0.66)+uFlash*0.3,clamp(foamAll,0.0,0.8)*0.65);
     col+=uFlash*vec3(0.12,0.14,0.2)*(0.3+fres);
     float ld=length(p-uLamp.xz);
@@ -417,7 +443,7 @@ const palmGeo=(function(){
 const palms=new THREE.InstancedMesh(palmGeo,new THREE.MeshLambertMaterial({vertexColors:true,side:THREE.DoubleSide}),CFG.palmN);
 palms.frustumCulled=false;palms.instanceMatrix.setUsage(THREE.DynamicDrawUsage);scene.add(palms);
 function placePalm(i,z){
-  palmZ[i]=z;const side=sidePick(),dist=rand(0.8,12)+(nearVillage(z)?40:0),x=riverC(z)+side*(riverW(z)/2+dist),sc=rand(0.8,1.3);
+  palmZ[i]=z;const side=sidePick(),dist=rand(0.8,12)+(nearVillage(z)?40:0),x=riverC(z)+side*(riverW(z)/2+dist),sc=rand(0.55,0.85);
   palmX[i]=x;
   put(palms,i,x,bankY(dist)-0.2+lvl(z),z,rand(-0.1,0.1),rand(0,6.28),rand(-0.1,0.1),sc,sc,sc,0,0,0.7+rand(0,0.3));
 }
@@ -431,13 +457,13 @@ function put(mesh,i,x,y,z,rx,ry,rz,sx,sy,sz,h,s,l){
 function placeTree(i,z){
   treeZ[i]=z;const side=sidePick(),hw=riverW(z)/2;
   const dist=1.8+(Math.random()<0.55?Math.random()*7:7+Math.random()*38)+(nearVillage(z)?40:0);
-  const x=riverC(z)+side*(hw+dist),h=rand(13,24),r=rand(0.9,1.5),y0=bankY(dist)-0.8+lvl(z);treeX[i]=x;
+  const x=riverC(z)+side*(hw+dist),h=rand(7,13),r=rand(0.6,1.0),y0=bankY(dist)-0.8+lvl(z);treeX[i]=x;
   put(trunks,i,x,y0,z,rand(-.04,.04),rand(0,6.28),rand(-.04,.04),r,h,r,0.075+rand(0,0.03),0.22+rand(0,.1),0.12+rand(0,.07));
-  const cs=rand(4.5,8),cy=rand(2.4,3.6);
+  const cs=rand(3,5.2),cy=rand(1.6,2.6);
   put(crowns,3*i,x,y0+h,z,0,rand(0,6.28),0,cs,cy,cs*rand(.85,1.15),0.26+rand(0,.06),0.38+rand(0,.2),0.10+rand(0,.08));
-  put(crowns,3*i+1,x+rand(-3,3),y0+h-rand(1,4),z+rand(-3,3),0,rand(0,6.28),0,cs*.7,cy*.8,cs*.7,0.27+rand(0,.06),0.4+rand(0,.2),0.09+rand(0,.08));
-  put(crowns,3*i+2,x+rand(-4,4),y0+h+rand(0.5,2),z+rand(-3,3),0,rand(0,6.28),0,cs*.6,cy*.9,cs*.6,0.28+rand(0,.06),0.45+rand(0,.2),0.14+rand(0,.08));
-  for(let k=0;k<2;k++)put(vines,2*i+k,x-side*rand(0.5,cs*0.8),y0+h-cy*0.4,z+rand(-cs,cs)*0.6,0,0,0,1,rand(4,11),1,0.25,0.4,0.12);
+  put(crowns,3*i+1,x+rand(-2,2),y0+h-rand(0.7,2.5),z+rand(-2,2),0,rand(0,6.28),0,cs*.7,cy*.8,cs*.7,0.27+rand(0,.06),0.4+rand(0,.2),0.09+rand(0,.08));
+  put(crowns,3*i+2,x+rand(-2.5,2.5),y0+h+rand(0.3,1.2),z+rand(-2,2),0,rand(0,6.28),0,cs*.6,cy*.9,cs*.6,0.28+rand(0,.06),0.45+rand(0,.2),0.14+rand(0,.08));
+  for(let k=0;k<2;k++)put(vines,2*i+k,x-side*rand(0.5,cs*0.8),y0+h-cy*0.4,z+rand(-cs,cs)*0.6,0,0,0,1,rand(2.5,6),1,0.25,0.4,0.12);
 }
 function placeBush(i,z){
   bushZ[i]=z;const side=sidePick(),dist=rand(0.6,9)+(nearVillage(z)?40:0),x=riverC(z)+side*(riverW(z)/2+dist),s=rand(1,2.6);bushX[i]=x;
@@ -475,7 +501,7 @@ function updateForest(){
 /* Obstáculos do rio: troncos, pedras, camalotes, bancos de areia e troncos em pé (igapó) */
 const OB={pool:[],front:0,on:false,gap:0};
 const KINDS=['log','rock','camalote','sand','stump'];
-const KIND_W=[[0.45,0.2,0.35,0,0],[0.5,0.25,0.25,0,0],[0,1,0,0,0],[0.5,0.2,0.3,0,0],[0,0,0,0,1],[0.3,0.12,0.18,0.4,0]]; // por fase
+const KIND_W=[[0.45,0.2,0.35,0,0],[0.45,0.05,0.5,0,0],[0.5,0.25,0.25,0,0],[0,1,0,0,0],[0.5,0.2,0.3,0,0],[0,0,0,0,1],[0.3,0.12,0.18,0.4,0],[0.4,0.1,0.5,0,0],[0.4,0.25,0.2,0.15,0]]; // por fase
 (function(){
   const lg=new THREE.CylinderGeometry(0.4,0.46,1,7);lg.rotateX(Math.PI/2);
   const mat=c=>new THREE.MeshLambertMaterial({color:c,emissive:0x0e1a12,flatShading:true}); // brilho mínimo: enxerga à noite
@@ -497,6 +523,7 @@ function placeObstacle(o,z,off,sz){
   if(off===undefined){
     off=Math.random()<0.4?P.o+rand(-8,8):rand(-hw,hw);
     if(o.kind==='sand'&&Math.random()<0.5)off=(Math.random()<0.5?-1:1)*rand(hw*0.35,hw);
+    if(phaseOf(progressAt(z))===PH.ENCONTRO){const b=bnd(z);off=Math.random()<0.85?rand(-hw,b-4):rand(b+4,hw);} // detritos no Negro, redemoinhos no Solimões
     off=clamp(off,-hw,hw);
   }
   o.z=z;o.x=riverC(z)+off;o.inside=false;o.active=true;
@@ -520,20 +547,22 @@ function spawnGate(kind,z,gapW,step){
 }
 function spawnOne(){
   const p=progressAt(OB.front),ph=phaseOf(p);
-  const z=OB.front-((ph===2||ph===4)?rand(36,44):lerp(48,24,smooth(p*1.2))*rand(0.75,1.3));
+  const z=OB.front-((ph===PH.TRILHA||ph===PH.IGAPO)?rand(36,44):lerp(48,24,smooth(p*1.2))*rand(0.75,1.3));
   if(z<zEnd()+60){OB.on=false;return false;}  // área da vila fica livre
   OB.front=z;
+  if(G.mission===2&&Math.abs(z-zAld())<70)return true;   // píer da aldeia fica livre
   if(LEDGES.some(l=>Math.abs(z-l)<24))return true; // nada em cima das quedas d'água
   const phz=phaseOf(progressAt(z));
-  if(phz===2)spawnGate('rock',z,11,5.5);
-  else if(phz===4)spawnGate('stump',z,9,4.5);
+  if(phz===PH.TRILHA)spawnGate('rock',z,11,5.5);
+  else if(phz===PH.IGAPO)spawnGate('stump',z,9,4.5);
   else{const o=OB.pool.find(q=>!q.active&&q.kind===pickKind(phz));if(o)placeObstacle(o,z);}
   return true;
 }
 function resetObstacles(active){
   OB.front=P.z-100;OB.on=!!active;OB.gap=0;
   for(const o of OB.pool){o.active=false;o.mesh.visible=false;o.z=1e9;o.inside=false;}
-  PK.front=P.z-80;PK.on=!!active;
+  PK.front=P.z-80;PK.on=!!active;KT.front=P.z-150;KT.on=!!active;
+  for(const q of KT.pool){q.active=false;q.mesh.visible=false;}
   for(const q of PK.pool){q.active=false;q.mesh.visible=false;}
 }
 function updateObstacles(dt){
@@ -563,7 +592,7 @@ function updateObstacles(dt){
       const c=Math.cos(o.rot),sn=Math.sin(o.rot),lx=dx*c-dz*sn,lz=dx*sn+dz*c;
       if(Math.abs(lx)<o.hw+0.65&&Math.abs(lz)<o.hl+2.0){
         P.s=Math.max(CFG.vMin*0.8,P.s*0.45);P.vo+=(dx>=0?1:-1)*6;P.shake=Math.max(P.shake,0.9);P.hitCD=0.8;
-        SFX.thud();emitSpray(P.x,0.3,P.z,22,4,6);
+        SFX.thud();emitSpray(P.x,0.3,P.z,22,4,6);hurt(o.kind==='log'?12:15);
       }
     }
   }
@@ -595,6 +624,36 @@ function updatePickups(dt){
   }
 }
 
+/* Kit de primeiros socorros: cura +25 de vida (raro) */
+const KT={pool:[],front:0,on:false};
+(function(){
+  const g=new THREE.BoxGeometry(0.9,0.55,0.65),m=new THREE.MeshLambertMaterial({color:0xefe9d8,emissive:0x2a2420}),red=new THREE.MeshBasicMaterial({color:0xd0352b});
+  for(let i=0;i<3;i++){
+    const mesh=new THREE.Mesh(g,m);
+    const a=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.02,0.14),red),b=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.02,0.5),red);
+    a.position.y=b.position.y=0.285;mesh.add(a,b);mesh.visible=false;scene.add(mesh);
+    KT.pool.push({mesh,active:false,x:0,z:1e9,ph:Math.random()*6});
+  }
+})();
+function updateKits(dt){
+  const playing=G.state==='playing';
+  if(KT.on)while(KT.front>P.z-230){
+    const z=KT.front-rand(380,520);KT.front=z;
+    if(z<zEnd()+80){KT.on=false;break;}
+    const q=KT.pool.find(k=>!k.active);if(!q)break;
+    const hw=riverW(z)/2-6;q.active=true;q.z=z;q.x=riverC(z)+rand(-hw,hw);q.mesh.visible=true;
+  }
+  for(const q of KT.pool){
+    if(!q.active)continue;
+    if(q.z>P.z+30){q.active=false;q.mesh.visible=false;continue;}
+    q.mesh.position.set(q.x,0.45+0.1*Math.sin(T*2.5+q.ph)+waveH(q.x,q.z,T,waveAmp())*0.8+lvl(q.z),q.z);
+    q.mesh.rotation.y=T*0.8+q.ph;
+    if(playing&&Math.hypot(P.x-q.x,P.z-q.z)<2.3){
+      q.active=false;q.mesh.visible=false;P.hp=Math.min(100,P.hp+25);SFX.pickup();toast('🩹 Kit de primeiros socorros: +25 de vida');
+    }
+  }
+}
+
 /* Quedas d'água: pedras nas margens, espuma, névoa e um impulso ao descer */
 const LR=makeInst(new THREE.DodecahedronGeometry(1,0),24);
 function placeLedgeRocks(){
@@ -616,8 +675,8 @@ function updateLedges(dt){
     if(!playing)continue;
     if(!st.warned&&dz<150&&dz>0){st.warned=true;showBanner('QUEDA D’ÁGUA!','Fique no centro do canal e segure firme');}
     if(Math.abs(dz)<7){
-      P.s=Math.min(P.s+12*dt,36);
-      if(!st.hit&&!st.done&&Math.abs(P.o)>riverW(zl)/2*0.62){st.hit=true;P.s*=0.5;P.shake=Math.max(P.shake,1);SFX.thud();toast('Bateu nas pedras da queda!');}
+      P.s=Math.min(P.s+12*dt,40);
+      if(!st.hit&&!st.done&&Math.abs(P.o)>riverW(zl)/2*0.62){st.hit=true;P.s*=0.5;P.shake=Math.max(P.shake,1);SFX.thud();toast('Bateu nas pedras da queda!');hurt(18);}
     }
     if(!st.done&&dz<-7){st.done=true;SFX.splash(1);emitSpray(P.x,0.3,P.z,40,7,6);P.shake=Math.max(P.shake,0.8);buzz(60);if(!st.hit)toast('Desceu a queda d’água!');}
   }
@@ -642,24 +701,24 @@ function spawnTree(){
   const z=P.z-rand(115,150);if(z<zEnd()+100)return;
   const side=Math.random()<0.5?-1:1,hw=riverW(z)/2;
   f.active=true;f.state=0;f.ang=0;f.t=0;f.side=side;f.z=z;f.hitCD=0;
-  f.len=hw*1.45+rand(-2,2);
+  f.len=hw*1.3+rand(-2,2);
   f.xb=riverC(z)+side*(hw+1.2);f.yb=groundY(side,z,1.2)-0.3;
   f.angF=Math.PI/2-Math.asin(clamp((f.yb-lvl(z)+0.1)/f.len,0,0.5));
-  f.trunk.scale.set(1,f.len,1);
-  f.crown.position.set(0,f.len,0);f.crown.scale.set(6,3.4,6);
-  f.crown2.position.set(2.5,f.len-3,1.5);f.crown2.scale.set(4.5,2.6,4.5);
+  f.trunk.scale.set(0.75,f.len,0.75);
+  f.crown.position.set(0,f.len,0);f.crown.scale.set(4.5,2.6,4.5);
+  f.crown2.position.set(1.8,f.len-2.2,1.2);f.crown2.scale.set(3.4,2,3.4);
   f.g.position.set(f.xb,f.yb,z);f.g.rotation.set(0,0,0);f.g.visible=true;
 }
 function updateTrees(dt){
   const playing=G.state==='playing';
-  if(playing&&G.phase>=3){FT.next-=dt;if(FT.next<=0){spawnTree();FT.next=G.phase===3?rand(8,13):rand(20,30);}}
+  if(playing&&G.phase>=PH.MATA){FT.next-=dt;if(FT.next<=0){spawnTree();FT.next=G.phase===PH.MATA?rand(8,13):rand(20,30);}}
   for(const f of FT.pool){
     if(!f.active)continue;
     if(f.z>P.z+70){f.active=false;f.g.visible=false;continue;}
     f.hitCD-=dt;
     if(f.state===0){
       f.ang=0.015*Math.sin(T*2.5+f.z);
-      if(playing&&P.z-f.z<95){f.state=1;f.t=0;SFX.creak();toast('🌳 Árvore caindo! Contorne pelo lado livre.');if(env.p<0.82&&Math.random()<0.6)strike();}
+      if(playing&&P.z-f.z<95){f.state=1;f.t=0;SFX.creak();toast('🌳 Árvore caindo! Contorne pelo lado livre.');if(env.p<0.82&&G.mission===1&&Math.random()<0.6)strike();}
     }else if(f.state===1){
       f.t+=dt;const u=clamp(f.t/1.8,0,1);f.ang=f.angF*u*u;
       if(u>=1){f.state=2;f.ang=f.angF;SFX.crash();emitSpray(f.xb-f.side*f.len*0.8,0.2,f.z,30,6,8);if(Math.abs(P.z-f.z)<60)P.shake=Math.max(P.shake,0.8);}
@@ -670,9 +729,9 @@ function updateTrees(dt){
     const sdist=((f.xb-P.x)*f.side)/sn;
     if(sdist<0||sdist>f.len)continue;
     const yRel=(f.yb-lvl(f.z))+sdist*Math.cos(f.ang);
-    if(yRel<2.4&&yRel>-1&&Math.abs(P.z-f.z)<1.4+(sdist>f.len-5?3.2:0)){
+    if(yRel<2.4&&yRel>-1&&Math.abs(P.z-f.z)<1.4+(sdist>f.len-4?2.6:0)){
       f.hitCD=0.9;P.s=Math.min(P.s,4);P.z+=2.4;P.shake=Math.max(P.shake,1.2);P.stamina=Math.max(0,P.stamina-0.25);
-      SFX.thud();toast('A árvore bloqueou o rio! Contorne pelo lado livre.');emitSpray(P.x,0.3,P.z,20,4,5);
+      SFX.thud();toast('A árvore bloqueou o rio! Contorne pelo lado livre.');emitSpray(P.x,0.3,P.z,20,4,5);hurt(25);
     }
   }
 }
@@ -702,12 +761,12 @@ const snR=u=>u<0.12?lerp(0.22,0.44,u/0.12):u<0.55?0.46:lerp(0.46,0.06,(u-0.55)/0
 function spawnSnake(){
   const z=P.z-150,hw=riverW(z)/2,side=Math.random()<0.5?-1:1;
   SN.active=true;SN.z=z;SN.dir=-side;SN.x0=riverC(z)+side*(hw+3);SN.age=0;SN.hitCD=0;SN.mesh.visible=true;SN.head.visible=true;
-  SN.next=G.phase>=2?rand(12,18):rand(16,24);
+  SN.next=G.phase>=PH.TRILHA?rand(12,18):rand(16,24);
   toast('🐍 Sucuri cruzando o rio à frente!');SFX.hiss();
 }
 function resetSnake(){SN.active=false;SN.mesh.visible=false;SN.head.visible=false;SN.next=rand(9,13);}
 function updateSnake(dt){
-  if(G.state==='playing'&&G.phase>=1&&!SN.active){SN.next-=dt;if(SN.next<=0&&P.z-150>zEnd()+90)spawnSnake();}
+  if(G.state==='playing'&&G.phase>=PH.BANZEIRO&&!SN.active&&!(G.board&&G.board.active)){SN.next-=dt;if(SN.next<=0&&P.z-150>zEnd()+90)spawnSnake();}
   if(!SN.active)return;
   SN.age+=dt;
   const hx=SN.x0+SN.dir*SN.speed*SN.age,amp=waveAmp(),lv=lvl(SN.z);
@@ -731,9 +790,41 @@ function updateSnake(dt){
     for(const q of SN.pts){
       if(Math.hypot(P.x-q.x,P.z-q.z)<q.r+1.0||Math.hypot(P.x-q.x,P.z+1.8-q.z)<q.r+0.8||Math.hypot(P.x-q.x,P.z-1.8-q.z)<q.r+0.8){
         SN.hitCD=1.4;P.s=Math.max(CFG.vMin*0.7,P.s*0.4);P.stamina=Math.max(0,P.stamina-0.3);P.shake=Math.max(P.shake,1.0);
-        SFX.hiss();SFX.thud();emitSpray(P.x,0.3,P.z,20,4,5);toast('🐍 A sucuri te enroscou! Reme!');
+        SFX.hiss();SFX.thud();emitSpray(P.x,0.3,P.z,20,4,5);toast('🐍 A sucuri te enroscou! Reme!');hurt(20);
         break;
       }
+    }
+  }
+}
+
+/* Redemoinhos: só na correnteza barrenta do Solimões */
+const WH={slots:[0,1,2].map(()=>({x:0,z:1e6,r:1,active:false,cd:0})),front:0};
+function resetWhirls(){for(const w of WH.slots){w.active=false;w.z=1e6;w.x=0;w.r=1;}WH.front=P.z-80;}
+function whirlDip(x,z){let y=0;for(const w of WH.slots){if(!w.active)continue;y-=1.2*Math.exp(-((x-w.x)*(x-w.x)+(z-w.z)*(z-w.z))/(w.r*w.r*0.6));}return y;}
+function updateWhirls(dt){
+  const playing=G.state==='playing';
+  if(playing&&G.phase===PH.ENCONTRO){
+    const zStop=meetZ()[1]+30;
+    while(WH.front>P.z-200){
+      const z=WH.front-rand(60,90);WH.front=z;
+      if(z<zStop)break;
+      const w=WH.slots.find(q=>!q.active);if(!w)break;
+      const hw=riverW(z)/2;
+      w.active=true;w.z=z;w.r=rand(4.5,6.5);w.x=riverC(z)+bnd(z)+rand(5,hw-6);w.cd=0;
+    }
+  }
+  for(const w of WH.slots){
+    if(!w.active)continue;
+    if(w.z>P.z+40){w.active=false;w.z=1e6;w.x=0;w.r=1;continue;}
+    if(!playing)continue;
+    const dx=w.x-P.x,dz=w.z-P.z,d=Math.hypot(dx,dz)+0.001,R=w.r*2.2;
+    if(d<R){
+      const k=1-d/R;
+      P.vo+=(dx/d*16-dz/d*10)*k*dt;          // puxa para o centro e gira
+      P.s=Math.max(P.s-14*k*dt,5);
+      P.shake=Math.max(P.shake,0.3*k);P.kick=Math.max(P.kick,0.4*k);
+      w.cd-=dt;
+      if(d<w.r*0.5&&w.cd<=0){w.cd=2;P.s=Math.min(P.s,5);P.stamina=Math.max(0,P.stamina-0.2);SFX.whirl();toast('🌀 REDEMOINHO! Reme para escapar!');buzz(50);}
     }
   }
 }
@@ -741,14 +832,14 @@ function updateSnake(dt){
 /* Banzeiro: ondas grandes que jogam a canoa de lado */
 const BZ={state:0,t:0,next:99,ph:0,k:1};
 function startBanzeiro(){
-  BZ.state=1;BZ.t=0;BZ.ph=rand(0,6.28);BZ.k=G.phase>=2?0.7:1;
+  BZ.state=1;BZ.t=0;BZ.ph=rand(0,6.28);BZ.k=G.phase>=PH.TRILHA?0.7:1;
   showBanner('BANZEIRO!','Segure firme — ondas vindo de lado');SFX.banzeiro();
 }
 function resetBanzeiro(){BZ.state=0;BZ.next=99;env.bz=0;}
 function updateBanzeiro(dt){
-  if(G.state==='playing'&&G.phase>=1){
+  if(G.state==='playing'&&G.phase>=PH.BANZEIRO){
     if(BZ.state===0){BZ.next-=dt;if(BZ.next<=0)startBanzeiro();}
-    else{BZ.t+=dt;if(BZ.t>8.2){BZ.state=0;BZ.next=G.phase>=2?rand(20,28):rand(12,18);}}
+    else{BZ.t+=dt;if(BZ.t>8.2){BZ.state=0;BZ.next=G.phase>=PH.TRILHA?rand(20,28):rand(12,18);}}
   }else if(G.state!=='playing')BZ.state=0;
   let e=0;
   if(BZ.state===1){const t=BZ.t;e=t<2.2?0.25*smooth(t/2.2):t<3.2?lerp(0.25,1,smooth(t-2.2)):t<6.2?1:smooth(1-(t-6.2)/2.0);}
@@ -919,9 +1010,9 @@ function updateIntro(dt){
     }
     ropeGeo.attributes.position.needsUpdate=true;
   }else ropeL.visible=false;
-  if(!I.c0&&t>0.9){I.c0=true;toast('Sua filha está com febre. O remédio só chega pelo rio, até a vila.');}
-  if(!I.c1&&t>4.6){I.c1=true;toast('A tempestade fechou a estrada. Só resta o rio.');}
-  if(!I.c2&&t>8.6){I.c2=true;toast('Um jacaré faminto vigia a água… Não olhe para trás.');}
+  if(!I.c0&&t>0.9){I.c0=true;toast('Você é técnico de enfermagem da saúde ribeirinha e indígena.');}
+  if(!I.c1&&t>4.6){I.c1=true;toast('Uma criança da Comunidade Boa Esperança está com febre alta.');}
+  if(!I.c2&&t>8.6){I.c2=true;toast('O remédio só chega pelo rio. E um jacaré vigia a água…');}
   if(t>=I.end)finishIntro();
 }
 /* câmera cinematográfica: plano da margem -> embarque -> câmera normal */
@@ -948,19 +1039,42 @@ const VH={stilt:vinst(stiltGeo,vWood,28),floor:vinst(new THREE.BoxGeometry(3.8,0
   roof:vinst(roofGeo,vWood,7),win:vinst(new THREE.BoxGeometry(0.05,0.55,0.7),vGlow,7),post:vinst(new THREE.CylinderGeometry(0.1,0.12,1.6,6),vWood,8),lamp:vinst(new THREE.SphereGeometry(0.16,8,6),vGlow,6)};
 VIL.pier=new THREE.Mesh(new THREE.BoxGeometry(12,0.14,2.4),new THREE.MeshLambertMaterial({color:0x6b5035}));VIL.g.add(VIL.pier);
 (function(){
-  const cv=document.createElement('canvas');cv.width=512;cv.height=128;const cx=cv.getContext('2d');
+  const cv=document.createElement('canvas');cv.width=512;cv.height=128;const cx=cv.getContext('2d');VIL.signCx=cx;
   cx.fillStyle='#4a3220';cx.fillRect(0,0,512,128);cx.strokeStyle='#2b1c10';cx.lineWidth=8;cx.strokeRect(4,4,504,120);
   cx.fillStyle='#f0d27a';cx.font='bold 38px Georgia,serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText('VILA BOA ESPERANÇA',256,66);
-  VIL.sign=new THREE.Mesh(new THREE.PlaneGeometry(3.6,0.9),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv),side:THREE.DoubleSide}));VIL.g.add(VIL.sign);
+  VIL.sign=new THREE.Mesh(new THREE.PlaneGeometry(3.6,0.9),new THREE.MeshBasicMaterial({map:(VIL.signTex=new THREE.CanvasTexture(cv)),side:THREE.DoubleSide}));VIL.g.add(VIL.sign);
   VIL.signPosts=[0,1].map(()=>{const p=new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.08,2.8,6),new THREE.MeshLambertMaterial({color:0x3b2a1a}));VIL.g.add(p);return p;});
   VIL.g.add(VIL.fig.g);
+  // maloca (aldeia) e prédio do Polo Base
+  const thatch=new THREE.MeshLambertMaterial({color:0x7a5a2a}),wall=new THREE.MeshLambertMaterial({color:0x8a6a44});
+  VIL.maloca=new THREE.Group();
+  const mb=new THREE.Mesh(new THREE.CylinderGeometry(4,4.2,2.6,12),wall);mb.position.y=1.3;
+  const mr=new THREE.Mesh(new THREE.ConeGeometry(5.6,3.6,12),thatch);mr.position.y=4.4;
+  VIL.maloca.add(mb,mr);VIL.maloca.visible=false;VIL.g.add(VIL.maloca);
+  VIL.polo=new THREE.Group();
+  const pb=new THREE.Mesh(new THREE.BoxGeometry(9,3.4,6),new THREE.MeshLambertMaterial({color:0xe8e4dc,emissive:0x1a1814}));pb.position.y=1.7;
+  const pr=new THREE.Mesh(new THREE.BoxGeometry(9.6,0.4,6.6),new THREE.MeshLambertMaterial({color:0xb23a2f}));pr.position.y=3.6;
+  const redM=new THREE.MeshBasicMaterial({color:0xd0352b});
+  const c1=new THREE.Mesh(new THREE.BoxGeometry(1.6,0.45,0.05),redM),c2=new THREE.Mesh(new THREE.BoxGeometry(0.45,1.6,0.05),redM);
+  c1.position.set(0,2.3,3.05);c2.position.set(0,2.3,3.05);
+  const wd=new THREE.Mesh(new THREE.BoxGeometry(1.2,1.0,0.05),vGlow);wd.position.set(3,1.8,3.05);
+  VIL.polo.add(pb,pr,c1,c2,wd);VIL.polo.visible=false;VIL.g.add(VIL.polo);
 })();
+function setSign(text){
+  const cx=VIL.signCx;if(!cx)return;
+  cx.fillStyle='#4a3220';cx.fillRect(0,0,512,128);cx.strokeStyle='#2b1c10';cx.lineWidth=8;cx.strokeRect(4,4,504,120);
+  cx.fillStyle='#f0d27a';cx.font='bold '+(text.length>20?30:38)+'px Georgia,serif';cx.textAlign='center';cx.textBaseline='middle';cx.fillText(text,256,66);
+  if(VIL.signTex)VIL.signTex.needsUpdate=true;
+}
 function vput(mesh,i,x,y,z,sy,h,sat,l){
   dummy.position.set(x,y,z);dummy.rotation.set(0,0,0);dummy.scale.set(1,sy,1);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);
   if(h!==undefined){colTmp.setHSL(h,sat,l);mesh.setColorAt(i,colTmp);}
 }
-function placeVillage(){
-  const ze=zEnd();
+function placeVillage(zc,kind){
+  kind=kind||(G.mission===2?'aldeia':'vila');
+  const ze=zc===undefined?(kind==='aldeia'?zAld():zEnd()):zc;
+  VIL.zc=ze;
+  setSign(kind==='aldeia'?'ALDEIA MARIPÁ':kind==='polo'?'POLO BASE · SAÚDE INDÍGENA':'COMUNIDADE BOA ESPERANÇA');
   const H=[[1,18,7],[1,5,12],[1,-6,9],[1,-27,8],[-1,12,9],[-1,-4,12],[-1,-20,7]]; // [margem, dz, distância]
   let si=0;
   H.forEach((h,i)=>{
@@ -982,20 +1096,91 @@ function placeVillage(){
   VIL.signPosts[0].position.set(xs-1.7,1.4+L0,zs);VIL.signPosts[1].position.set(xs+1.7,1.4+L0,zs);
   VIL.fig.g.position.set(VIL.endX,0.72+L0,zp);VIL.fig.g.rotation.y=Math.PI/2;
   VIL.light.position.set(VIL.endX,2.4+L0,zp);
+  VIL.maloca.visible=kind==='aldeia';VIL.polo.visible=kind==='polo';
+  const zm=ze-10;VIL.maloca.position.set(riverC(zm)+riverW(zm)/2+22,groundY(1,zm,22),zm);
+  const zq=ze+2;VIL.polo.position.set(riverC(zq)+riverW(zq)/2+18,groundY(1,zq,18),zq);VIL.polo.rotation.y=-Math.PI/2; // fachada para o rio
   for(const m of Object.values(VH)){m.instanceMatrix.needsUpdate=true;if(m.instanceColor)m.instanceColor.needsUpdate=true;}
 }
 function updateVillage(){
   VIL.g.visible=G.state!=='menu';
-  VIL.light.intensity=G.state==='menu'?0:smooth((env.p-0.85)/0.12)*1.8;
+  VIL.light.intensity=G.state==='menu'?0:(1-smooth((Math.abs(P.z-VIL.zc)-60)/200))*1.8;
   VIL.fig.parts.armR.rotation.z=2.6+Math.sin(T*7)*0.35;
 }
 placeVillage();
 function setRunOrigin(forMenu){
   RUN_Z0=P.z;bankBase=null;
-  LEDGES=forMenu?[]:[RUN_Z0-COURSE.L*0.37,RUN_Z0-COURSE.L*0.45];
+  LEDGES=(forMenu||G.mission===2)?[]:[RUN_Z0-COURSE.L*0.47,RUN_Z0-COURSE.L*0.54];
   LD=LEDGES.map(()=>({warned:false,hit:false,done:false}));
   if(worldDirty){rebuildForest();worldDirty=false;}
   placeLedgeRocks();placeVillage();
+}
+
+/* ===== Missão 2: buscar a paciente na aldeia e levá-la ao Polo Base ===== */
+const dockM=new THREE.Mesh(new THREE.TorusGeometry(3.2,0.18,8,28),new THREE.MeshBasicMaterial({color:0xffd24a,transparent:true,opacity:0.9}));
+dockM.rotation.x=Math.PI/2;dockM.visible=false;scene.add(dockM);
+const PT=makeFigure(0xbcd0e0,'patient');PT.g.visible=false;scene.add(PT.g);         // paciente caminhando até a canoa
+const SEAT=makeFigure(0xbcd0e0,'patient');                                          // paciente sentada na canoa
+SEAT.g.position.set(0,-0.55,-0.85);SEAT.parts.legL.rotation.x=1.5;SEAT.parts.legR.rotation.x=1.5;
+SEAT.parts.armL.rotation.x=-0.7;SEAT.parts.armR.rotation.x=-0.7;SEAT.g.visible=false;canoeG.add(SEAT.g);
+const dockZ=()=>zAld()-14;
+function startBoarding(){G.board={active:true,t:0};PT.g.visible=true;toast('A paciente está a caminho da canoa…');}
+function updateDock(dt){
+  const act=G.state==='playing'&&G.mission===2&&!G.patient;
+  dockM.visible=act;
+  if(!act)return;
+  const zd=dockZ(),ot=riverW(zd)/2-12,D_=G.dock;
+  dockM.position.set(riverC(zd)+ot,lvl(zd)+0.15+0.05*Math.sin(T*3),zd);
+  const dz=P.z-zd,lat=Math.abs(P.o-ot);
+  if(!D_.warned&&dz<140){D_.warned=true;showBanner('ALDEIA MARIPÁ','Segure S para reduzir e fique dentro do círculo dourado, ao lado do píer','A anciã aguarda o transporte até o Polo Base.');}
+  if(G.board&&G.board.active)return;
+  if(Math.abs(dz)<12&&lat<5&&P.s<9){D_.t+=dt;if(D_.t>0.9)startBoarding();}else D_.t=Math.max(0,D_.t-dt);
+  if(dz<-45){ // passou direto do píer: volta um trecho para tentar de novo
+    D_.missed++;toast('Você passou do píer! Voltando para tentar de novo.');
+    P.z=zd+130;P.s=Math.min(P.s,12);P.o=0;P.vo=0;resetObstacles(true);hurt(8);
+  }
+}
+function updateBoarding(dt){
+  const B=G.board;if(!B||!B.active)return;
+  B.t+=dt;canoeG.updateMatrixWorld(true);
+  const zp=VIL.zp,y0=0.72+lvl(zp);
+  if(B.t<3){
+    const u=B.t/3;
+    PT.g.position.set(VIL.endX+lerp(7,0.6,u),y0,zp+0.4);PT.g.rotation.y=Math.PI/2;
+    const a=Math.sin(B.t*8);PT.parts.legL.rotation.x=a*0.7;PT.parts.legR.rotation.x=-a*0.7;PT.parts.armL.rotation.x=-a*0.4;PT.parts.armR.rotation.x=a*0.4;
+    if(Math.floor(B.t*8/Math.PI)!==Math.floor((B.t-dt)*8/Math.PI))SFX.step();
+  }else if(B.t<4.2){
+    const u=smooth((B.t-3)/1.2);vSeat.set(0,0.2,-0.85);canoeG.localToWorld(vSeat);
+    PT.g.position.set(lerp(VIL.endX+0.6,vSeat.x,u),lerp(y0,vSeat.y,u)+Math.sin(Math.PI*u)*0.5,lerp(zp+0.4,vSeat.z,u));
+    PT.g.rotation.y=lerp(Math.PI/2,P.yaw,u);
+    PT.parts.legL.rotation.x=0.9*Math.sin(Math.PI*u);PT.parts.legR.rotation.x=-0.4*Math.sin(Math.PI*u);
+  }else{
+    PT.g.visible=false;SEAT.g.visible=true;B.active=false;G.patient=true;G.phase=PH.POLO;P.kick=1;SFX.board();
+    C.emerged=false;C.D=CFG.startGap+15;                 // o jacaré volta a seguir a canoa
+    toast('Paciente a bordo! Rumo ao Polo Base.');
+    showBanner('FASE 9 — '+COURSE.names[PH.POLO],COURSE.subs[PH.POLO],COURSE.story[PH.POLO]);SFX.sting();
+  }
+}
+function updateMission2(){
+  if(G.mission!==2)return;
+  if(G.patient&&!G.poloPlaced&&P.z<zAld()-260){G.poloPlaced=true;placeVillage(zEnd(),'polo');}  // o Polo Base aparece à frente
+}
+function startMission2(){
+  hide($('end'));hide($('btnNext'));
+  G.mission=2;COURSE.L=COURSE.L2;G.phase=PH.BUSCA;G.patient=false;G.poloPlaced=false;G.board=null;G.dock={t:0,warned:false,missed:0};
+  G.near=false;G.endDelay=0;G.cause='croc';
+  SEAT.g.visible=false;PT.g.visible=false;
+  P.hp=Math.min(100,P.hp+40);P.stamina=1;P.exhausted=false;P.hitCD=0;P.inv=0;P.shake=0;P.kick=0;P.s=0;P.vo=0;
+  Object.assign(C,{D:CFG.startGap,o:0,surf:0,surfTarget:0,emerged:false,diving:false,diveT:0,nextDive:rand(14,20),nextSurge:rand(10,15),surgeT:0,beatT:0});
+  env.danger=0;L.ft=99;
+  resetSnake();resetBanzeiro();resetTrees();resetWhirls();
+  BZ.next=14;SN.next=rand(12,18);FT.next=30;
+  worldDirty=true;setRunOrigin(false);          // reconstrói margens e floresta para o novo trecho
+  camX=riverC(P.z);camY=3.1;
+  resetObstacles(true);
+  G.state='playing';vignEl.style.opacity=0;
+  fadeEl.style.transition='none';fadeEl.style.opacity=1;void fadeEl.offsetWidth;fadeEl.style.transition='opacity 1.8s ease';fadeEl.style.opacity=0;
+  setUI();
+  showBanner('MISSÃO 2 — '+COURSE.names[PH.BUSCA],COURSE.subs[PH.BUSCA],COURSE.story[PH.BUSCA]);
 }
 
 /* Névoa baixa: camadas de bruma que deslizam sobre a água (mais forte no igapó) */
@@ -1019,7 +1204,7 @@ const MIST=[];
   }
 })();
 function updateMist(){
-  const base=lvl(P.z),amt=0.2+0.5*env.ig+0.1*env.rain;
+  const base=lvl(P.z),amt=0.2+0.5*env.ig+0.1*env.rain+0.3*(G.mission===2?Math.max(0,1-env.p*2):0);
   for(let i=0;i<MIST.length;i++){
     const m=MIST[i];m.visible=i<QF[quality].mist;if(!m.visible)continue;
     m.position.set(P.x,base+0.5+i*1.3,P.z);
@@ -1069,9 +1254,9 @@ function strike(){
 }
 function updateLightning(dt){
   const st=G.state;
-  if(st==='menu'||st==='intro'||(st==='playing'&&G.t>20&&env.p<0.82)||(st==='lost'&&env.p<0.82)){
+  if(st==='menu'||st==='intro'||(st==='playing'&&G.t>20&&env.p<0.82&&G.mission===1)||(st==='lost'&&env.p<0.82&&G.mission===1)){
     L.next-=dt;
-    if(L.next<=0){strike();L.next=(st==='menu'||st==='intro')?rand(9,15):lerp(14,8,smooth(G.t/80))*rand(0.8,1.25)*(G.phase===3?0.6:1);}
+    if(L.next<=0){strike();L.next=(st==='menu'||st==='intro')?rand(9,15):lerp(14,8,smooth(G.t/80))*rand(0.8,1.25)*(G.phase===PH.MATA?0.6:1);}
   }
   for(let i=THUNDER.length-1;i>=0;i--)if(T>=THUNDER[i].t){const q=THUNDER[i];P.shake=Math.max(P.shake,0.35*q.pw);buzz(Math.round(40*q.pw));THUNDER.splice(i,1);}
   L.rumble-=dt;if(L.rumble<=0){L.rumble=rand(14,26);if(env.rain>0.6&&st==='playing')SFX.thunder(0,0.22);}
@@ -1145,6 +1330,7 @@ const SFX={
   leaf(){this.burst({type:'bandpass',f0:2500,f1:1200,dur:0.35,vol:0.12});},
   sting(){this.tone('sawtooth',110,70,0.9,0.18);this.tone('sine',55,45,1.2,0.3);},
   arrive(){[523,659,784,1047].forEach((f,i)=>this.tone('sine',f,f*1.002,1.4,0.16,i*0.28));},
+  whirl(){this.burst({type:'bandpass',f0:300,f1:1400,dur:1.2,vol:0.25,q:2,buf:'brown'});},
   pickup(){this.tone('sine',660,990,0.18,0.18);this.tone('sine',990,1320,0.2,0.14,0.08);buzz(15);},
   creak(){this.tone('sawtooth',90,60,1.2,0.14);this.tone('sawtooth',130,80,1.0,0.08,0.3);this.burst({type:'bandpass',f0:600,f1:200,dur:1.4,vol:0.12,q:2});},
   crash(){this.burst({f0:1200,f1:80,dur:1.6,vol:0.9,buf:'brown',attack:0.02});this.splash(1);this.tone('sine',70,30,0.8,0.6);buzz(120);},
@@ -1259,13 +1445,17 @@ function toast(msg){toastEl.textContent=msg;toastEl.classList.add('on');clearTim
 function updateHUD(dt){
   hudTimer-=dt;if(hudTimer>0)return;hudTimer=0.1;
   const near=env.danger>0.15,tired=P.exhausted,pct=Math.round(env.p*100);
-  $('hudPhase').textContent='FASE '+(G.phase+1)+'/6 · '+COURSE.names[G.phase];
-  barsEl.innerHTML='Velocidade: '+bar(P.s/CFG.vMax)+'\n'+
+  const mzv=meetW(P.z),kv=laneK(P.z,P.o),lane=mzv>0.3?'\nCorrente: '+(kv>0.3?'SOLIMÕES (rápida)':kv<-0.3?'RIO NEGRO (lenta)':'ENCONTRO'):'';
+  const obj=G.mission===1?'entregar o remédio':(G.patient?'levar a paciente ao Polo':'buscar a paciente');
+  $('hudPhase').textContent='FASE '+(G.phase+1)+'/9 · '+COURSE.names[G.phase];
+  barsEl.innerHTML='Missão '+G.mission+': '+obj+'\n'+
+    'Vida: <span class="'+(P.hp<30?'warn':'')+'">'+bar(P.hp/100)+'</span> '+Math.round(P.hp)+'%\n'+
+    'Velocidade: '+bar(P.s/CFG.vMax)+'\n'+
     'Distância do jacaré: <span class="'+(near?'warn':'')+'">'+bar(C.D/100)+'</span>\n'+
     'Fôlego: <span class="'+(tired?'tired':'')+'">'+bar(P.stamina)+(tired?' ⚠':'')+'</span>\n'+
     'Percurso: '+bar(env.p)+' '+pct+'%\n'+
     'Pontos: '+calcScore(false)+'  🫐 '+G.acai+'\n'+
-    'Hora: '+timeLabel(env.p);
+    'Hora: '+timeLabel(env.p)+lane;
   dangerEl.classList.toggle('hidden',!(near&&G.state==='playing'));
   mirrorEl.classList.toggle('alert',near);
 }
@@ -1289,11 +1479,11 @@ function setUI(){
   ['cineT','cineB','btnSkip'].forEach(id=>st==='intro'?show($(id)):hide($(id)));
 }
 function endScreen(win){
-  const e=$('end');e.className='overlay '+(win?'win':'lose');
-  $('endTitle').textContent=win?'VOCÊ ESCAPOU!':'O JACARÉ TE PEGOU!';
+  const e=$('end');hide($('btnNext'));e.className='overlay '+(win?'win':'lose');
+  $('endTitle').textContent=win?'MISSÃO CUMPRIDA!':(G.cause==='wreck'?'A CANOA NAUFRAGOU!':'O JACARÉ TE PEGOU!');
   $('endSub').textContent=win
-    ?'Você chegou à Vila Boa Esperança ao amanhecer, em '+fmt(G.t)+'. O remédio chegou a tempo — a Aninha vai ficar bem.'
-    :'Você caiu na fase '+(G.phase+1)+' ('+COURSE.names[G.phase]+'), a '+Math.round(G.endP*100)+'% do caminho, após '+fmt(G.t)+'. O remédio não chegou… tente de novo.';
+    ?'Você levou a anciã da Aldeia Maripá ao Polo Base, onde a equipe médica a avaliou a tempo. Duas missões, um só rio — as comunidades contam com você.'
+    :'Você caiu na fase '+(G.phase+1)+' ('+COURSE.names[G.phase]+'), a '+Math.round(G.endP*100)+'% do caminho, após '+fmt(G.t)+'. '+(G.cause==='wreck'?'A canoa não resistiu às batidas.':'O jacaré alcançou a canoa.')+' Tente de novo.';
   const p=Store.cur();
   $('endScore').textContent=G.finalScore+' pontos'+(G.newBest?' — novo recorde!':'')+(p?' · '+p.name:' (sem perfil: pontos não salvos)');
   show(e);
@@ -1309,6 +1499,7 @@ $('btnLogin').onclick=()=>doLogin($('playerName').value);
 $('btnGuest').onclick=()=>doLogin('Visitante');
 $('btnLoginCancel').onclick=()=>{hide($('login'));afterLogin=null;};
 $('btnRank').onclick=showRank;
+$('btnNext').onclick=startMission2;
 $('btnRankClose').onclick=()=>hide($('rank'));
 ['keydown','keyup'].forEach(ev=>$('playerName').addEventListener(ev,e=>{e.stopPropagation();if(ev==='keydown'&&(e.key==='Enter'||e.code==='Enter'))doLogin($('playerName').value);}));
 $('btnSkip').onclick=()=>startGame();
@@ -1354,12 +1545,13 @@ const Store={
   },
   cur(){return this.data.profiles[this.data.current]||null;},
   list(){return Object.values(this.data.profiles).sort((a,b)=>((b.last&&b.last.date)||0)-((a.last&&a.last.date)||0));},
-  submit(e){const p=this.cur();if(!p)return false;p.runs++;p.last=e;const nb=!p.best||e.score>p.best.score;if(nb)p.best=e;this.save();return nb;},
+  submit(e,partial){const p=this.cur();if(!p)return false;if(!partial)p.runs++;p.last=e;const nb=!p.best||e.score>p.best.score;if(nb)p.best=e;this.save();return nb;},
   ranking(){return Object.values(this.data.profiles).filter(p=>p.best).sort((a,b)=>b.best.score-a.best.score).slice(0,10);}
 };
 Store.load();
 const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function calcScore(won){const dist=clamp(RUN_Z0-P.z,0,COURSE.L);return Math.round(dist+G.acai*50+(won?1000+Math.max(0,300-G.t)*5:0));}
+function overallP(){return G.mission===2?(COURSE.L1+clamp(env.p,0,1)*COURSE.L2)/(COURSE.L1+COURSE.L2):env.p*COURSE.L1/(COURSE.L1+COURSE.L2);}
+function calcScore(final){const dist=(G.mission===2?COURSE.L1:0)+clamp(RUN_Z0-P.z,0,COURSE.L);return Math.round(dist+G.acai*50+(G.m1done?1000:0)+(final?1500+Math.max(0,480-G.t)*5:0));}
 let afterLogin=null;
 function renderPlayer(){const p=Store.cur();$('pName').textContent=p?p.name:'—';$('pId').textContent=p?'#'+p.id:'';}
 function showLogin(cb){
@@ -1394,18 +1586,21 @@ function toMenu(){
   resetObstacles(false);renderScore();setUI();
 }
 function resetRun(){
+  G.mission=1;COURSE.L=COURSE.L1;G.patient=false;G.m1done=false;G.board=null;G.cause='croc';G.lostT=0;G.poloPlaced=false;G.dock={t:0,warned:false,missed:0};
+  P.hp=100;P.inv=0;P.hurtT=0;SEAT.g.visible=false;PT.g.visible=false;
   SFX.resume();
   G.t=0;G.endDelay=0;G.evt=0;G.phase=0;G.near=false;G.endP=0;
   P.stamina=1;P.exhausted=false;P.hitCD=0;P.shake=0;P.kick=0;
   Object.assign(C,{D:CFG.startGap,o:0,surf:0,surfTarget:0,emerged:false,diving:false,diveT:0,nextDive:rand(14,20),nextSurge:rand(10,15),surgeT:0,beatT:0});
   env.danger=0;L.ft=99;
-  resetSnake();resetBanzeiro();resetTrees();G.acai=0;G.finalScore=0;G.newBest=false;
+  resetSnake();resetBanzeiro();resetTrees();resetWhirls();G.acai=0;G.finalScore=0;G.newBest=false;
   vignEl.style.opacity=0;
 }
 function onPhase(ph){
   showBanner('FASE '+(ph+1)+' — '+COURSE.names[ph],COURSE.subs[ph],COURSE.story[ph]);SFX.sting();
-  if(ph===1){BZ.next=6;SN.next=rand(10,14);}
-  if(ph===3)FT.next=5;
+  if(ph===PH.ENCONTRO)WH.front=P.z-80;
+  if(ph===PH.BANZEIRO){BZ.next=6;SN.next=rand(10,14);}
+  if(ph===PH.MATA)FT.next=5;
 }
 function endIntroVisuals(){
   walkerG.visible=false;riderG.visible=true;ropeL.visible=false;stakeM.visible=false;
@@ -1443,21 +1638,45 @@ function finishIntro(){
   showBanner('FASE 1 — '+COURSE.names[0],COURSE.subs[0],COURSE.story[0]);
 }
 function win(){
-  G.finalScore=calcScore(true);G.endP=1;
-  G.newBest=Store.submit({score:G.finalScore,time:Math.floor(G.t),progress:1,won:true,acai:G.acai,phase:5,date:Date.now()});
-  G.state='won';G.endDelay=3.5;setUI();
-  toast('Você chegou à vila!');SFX.arrive();
+  G.endP=1;
+  if(G.mission===1){                      // missão 1 cumprida: a criança recebe o remédio
+    G.m1done=true;G.finalScore=calcScore(false);
+    Store.submit({score:G.finalScore,time:Math.floor(G.t),progress:COURSE.L1/(COURSE.L1+COURSE.L2),won:false,acai:G.acai,phase:6,date:Date.now()},true);
+    G.state='won';G.endDelay=3.5;setUI();
+    toast('Medicamento entregue à comunidade!');SFX.arrive();
+  }else{                                  // missão 2 cumprida: paciente no Polo Base
+    G.finalScore=calcScore(true);
+    G.newBest=Store.submit({score:G.finalScore,time:Math.floor(G.t),progress:1,won:true,acai:G.acai,phase:8,date:Date.now()});
+    G.state='won';G.endDelay=3.5;setUI();
+    toast('Paciente entregue ao Polo Base!');SFX.arrive();
+  }
+}
+function intermission(){
+  const e=$('end');e.className='overlay win';
+  $('endTitle').textContent='VOCÊ ESCAPOU!';
+  $('endSub').textContent='Missão 1 cumprida: o remédio chegou à Comunidade Boa Esperança e a febre da criança vai ceder. Pelo rádio, nova chamada: uma anciã espera na Aldeia Maripá, rio abaixo, e precisa ser levada ao Polo Base para avaliação médica. A equipe reparou um pouco a canoa.';
+  $('endScore').textContent=G.finalScore+' pontos';
+  show($('btnNext'));show(e);
 }
 function lose(){
-  G.endP=env.p;G.finalScore=calcScore(false);
-  G.newBest=Store.submit({score:G.finalScore,time:Math.floor(G.t),progress:env.p,won:false,acai:G.acai,phase:G.phase,date:Date.now()});
-  G.state='lost';G.endDelay=1.8;P.shake=1.4;
-  SFX.crunch();emitSpray(P.x,0.3,P.z+2,40,6,8);vignEl.style.opacity=1;setUI();
+  G.endP=overallP();G.finalScore=calcScore(false);
+  G.newBest=Store.submit({score:G.finalScore,time:Math.floor(G.t),progress:G.endP,won:false,acai:G.acai,phase:G.phase,date:Date.now()});
+  G.state='lost';G.endDelay=1.8;G.lostT=0;P.shake=1.4;
+  if(G.cause==='wreck'){SFX.crash();emitSpray(P.x,0.3,P.z,40,6,8);}
+  else{SFX.crunch();emitSpray(P.x,0.3,P.z+2,40,6,8);}
+  vignEl.style.opacity=1;setUI();
 }
 
 /* ============================================================
    UPDATE
    ============================================================ */
+/* Vida da canoa: toda batida (pedra, tronco, cobra, árvore, margem) causa dano */
+function hurt(n){
+  if(G.state!=='playing'||P.inv>0)return;
+  if(G.patient)n*=1.3;                       // com paciente a bordo as batidas pesam mais
+  P.hp=Math.max(0,P.hp-n);P.inv=0.5;P.hurtT=0.4;buzz(30);
+  if(P.hp<=0){G.cause='wreck';lose();}
+}
 function updatePlayer(dt){
   const st=G.state;
   const moored=(st==='intro'&&G.ti<I.push);
@@ -1466,11 +1685,14 @@ function updatePlayer(dt){
   else if(st==='menu'){steer=clamp(-P.o*0.12-P.vo*0.25,-1,1);}
   else if(st==='won'){steer=clamp((riverW(P.z)/2-12-P.o)*0.12-P.vo*0.25,-1,1);}
   else if(st==='intro'&&!moored){steer=clamp((I.hw*0.6-P.o)*0.15-P.vo*0.12,-1,1);}
-  const cruise=st==='menu'?14:12+5*smooth(G.t/30);
+  if(G.board&&G.board.active){steer=clamp((riverW(P.z)/2-12-P.o)*0.12-P.vo*0.25,-1,1);up=false;down=false;}
+  const cruise=st==='menu'?16:14+5*smooth(G.t/30);
   const cap=P.exhausted?CFG.vTired:CFG.vMax;
   let target=cruise;if(up)target=cap;else if(down)target=CFG.vMin;
-  target=Math.min(target,cap*(1-0.2*env.bz));if(st==='lost'||st==='won')target=0;
-  const acc=target>P.s?12:(st==='lost'?14:18);
+  target=Math.min(target,cap*(1-0.2*env.bz));if(st==='lost'||st==='won'||(G.board&&G.board.active))target=0;
+  const mz=meetW(P.z),kk=laneK(P.z,P.o);
+  target*=1+mz*lerp(-0.12,0.18,(kk+1)/2);   // Negro mais lento, Solimões mais rápido
+  const acc=target>P.s?20:(st==='lost'?14:26);
   P.s+=clamp(target-P.s,-acc*dt,acc*dt);
   if(moored)P.s=0;
   if(st==='playing'){
@@ -1481,18 +1703,18 @@ function updatePlayer(dt){
     if(P.exhausted&&P.stamina>=CFG.resumeAt)P.exhausted=false;
   }
   // lateral: controle + deriva centrífuga nas curvas
-  const drift=-riverDDC(P.z)*P.s*P.s*0.8*(st==='lost'?0.3:1)+env.bz*15*Math.sin(T*1.7+BZ.ph);
-  P.vo+=(steer*22+drift-P.vo*2.4)*dt;
+  const drift=-riverDDC(P.z)*P.s*P.s*0.8*(st==='lost'?0.3:1)+env.bz*15*Math.sin(T*1.7+BZ.ph)+mz*Math.max(0,kk)*7*Math.sin(T*2.1+P.z*0.07)*Math.sin(T*0.9+1);
+  P.vo+=(steer*36+drift-P.vo*2.2)*dt;
   if(moored)P.vo=0;
   P.o+=P.vo*dt;
   const lim=riverW(P.z)/2-2.6;
   if(Math.abs(P.o)>lim){
     P.o=Math.sign(P.o)*lim;P.vo*=-0.35;
-    if(st==='playing'&&P.hitCD<=0){P.s*=0.8;P.shake=Math.max(P.shake,0.6);P.hitCD=0.6;SFX.thud();emitSpray(P.x,0.2,P.z,14,3,4);}
+    if(st==='playing'&&P.hitCD<=0){P.s*=0.8;P.shake=Math.max(P.shake,0.6);P.hitCD=0.6;SFX.thud();emitSpray(P.x,0.2,P.z,14,3,4);hurt(5);}
   }
-  P.hitCD-=dt;
+  P.hitCD-=dt;P.inv-=dt;P.hurtT-=dt;
   P.z-=P.s*dt;P.x=riverC(P.z)+P.o;
-  P.yaw=damp(P.yaw,Math.atan2(riverDC(P.z)*P.s-P.vo,Math.max(P.s,5)),4,dt);
+  P.yaw=damp(P.yaw,Math.atan2(riverDC(P.z)*P.s-P.vo,Math.max(P.s,5)),6,dt);
   // balanço nas ondas
   const amp=waveAmp();
   P.waveY=waveH(P.x,P.z,T,amp);
@@ -1501,7 +1723,7 @@ function updatePlayer(dt){
   P.roll=damp(P.roll,-P.vo*0.02+Math.atan(sr)*1.5+(st==='lost'?Math.sin(T*9)*0.25:0)+Math.sin(T*8)*0.1*P.kick+env.bz*0.2*Math.sin(T*2.4),6,dt);
   P.kick*=Math.exp(-2.2*dt);
   P.pitch=damp(P.pitch,Math.atan(sp)*1.5+(P.s/CFG.vMax)*0.05,6,dt);
-  canoeG.position.set(P.x,P.waveY*0.9+0.08-0.12*P.kick+lvl(P.z),P.z);
+  canoeG.position.set(P.x,P.waveY*0.9+0.08-0.12*P.kick+lvl(P.z)+whirlDip(P.x,P.z)-(st==='lost'&&G.cause==='wreck'?Math.min(1.8,G.lostT*0.9):0),P.z);
   canoeG.rotation.set(P.pitch,P.yaw,P.roll);
   // remada
   const oldPh=P.ph;P.ph+=dt*(2.4+P.s*0.1+(up?2:0));
@@ -1517,11 +1739,11 @@ function updateCroc(dt){
   const st=G.state;let danger=0;
   if(st==='playing'){
     const t=G.t;
-    if(t>=CFG.appearT&&!C.emerged){C.emerged=true;emergeFx(true);}
+    if(t>=CFG.appearT&&!C.emerged&&(G.mission===1||G.patient)){C.emerged=true;emergeFx(true);}
     if(C.emerged){
       if(!C.diving){C.nextDive-=dt;if(C.nextDive<=0){C.diving=true;C.diveT=2.2;}}
       else{C.diveT-=dt;if(C.diveT<=0){C.diving=false;C.nextDive=rand(12,20);C.surgeT=rand(1.6,2.4);emergeFx(false);}}
-      let vC=13+7*smooth(env.p)+(G.phase>=4?1:0);
+      const pp=G.mission===2?0.65+0.35*env.p:env.p;let vC=14+8*smooth(pp)+(G.phase>=PH.IGAPO?1:0);
       if(C.surgeT>0){vC+=6;C.surgeT-=dt;}
       else{C.nextSurge-=dt;if(C.nextSurge<=0){C.surgeT=rand(1.8,3);C.nextSurge=rand(11,18);SFX.growl();}}
       if(C.diving)vC*=0.7;
@@ -1529,9 +1751,9 @@ function updateCroc(dt){
       C.D=clamp(C.D+(P.s-vC)*dt,0,CFG.maxGap);C.vC=vC;
       C.surfTarget=C.diving?0:1;
       danger=clamp((CFG.dangerDist-C.D)/(CFG.dangerDist-CFG.catchDist),0,1);
-      if(C.D<=CFG.catchDist){lose();danger=1;}
+      if(C.D<=CFG.catchDist){G.cause='croc';lose();danger=1;}
     }else{C.surfTarget=0;C.vC=P.s;}
-  }else if(st==='lost'){C.D=damp(C.D,2.6,5,dt);C.surfTarget=1;danger=1;}
+  }else if(st==='lost'){if(G.cause==='croc'){C.D=damp(C.D,2.6,5,dt);C.surfTarget=1;danger=1;}else C.surfTarget=0;}
   else if(st==='won'){C.surfTarget=0;C.D+=dt*8;}
   else{C.surfTarget=0;}
   // alerta sonoro ao entrar na zona de perigo + batimentos
@@ -1562,7 +1784,7 @@ function updateCroc(dt){
 function updateCamera(dt){
   camYaw=damp(camYaw,P.yaw,2.2,dt);
   const back=8.4+(P.s-14)*0.05,sy=Math.sin(camYaw),cy=Math.cos(camYaw);
-  camX=damp(camX,P.x+sy*back,5,dt);camY=damp(camY,3.1+P.waveY*0.6+lvl(P.z),4,dt);
+  camX=damp(camX,P.x+sy*back,7,dt);camY=damp(camY,3.1+P.waveY*0.6+lvl(P.z),4,dt);
   P.shake=Math.max(P.shake*Math.exp(-4*dt),env.danger*0.45,env.bz*0.35);
   const sh=P.shake*0.28;
   camNP.set(camX+Math.sin(T*53)*sh*0.7,camY+Math.sin(T*61+1)*sh*0.5,P.z+cy*back);
@@ -1593,6 +1815,8 @@ function updateWorldFx(dt){
   u.uTime.value=T;u.uAmp.value=waveAmp();u.uRain.value=rain;u.uFlash.value=f;u.uSky.value.copy(fogTmp);u.uSpeed.value=P.s;
   u.uCanoe.value.set(P.x,P.z);u.uCroc.value.set(C.x,C.z-CROC_TIP);u.uCrocVis.value=C.surf;
   const la=u.uLed.value;for(let i=0;i<3;i++)la[i]=LEDGES[i]!==undefined?LEDGES[i]:0;u.uLedN.value=LEDGES.length;
+  for(let i=0;i<3;i++){const w=WH.slots[i];u.uWx.value[i]=w.x;u.uWz.value[i]=w.z;u.uWr.value[i]=w.r;}
+  const mzz=meetZ();u.uMeetA.value=mzz[0];u.uMeetB.value=mzz[1];u.uMeetOn.value=env.run?1:0;
   u.uMoon.value=(1-dl)*(1-0.7*Math.min(1,rain));
   u.uLamp.value.set(P.x-Math.sin(P.yaw)*2.2,0,P.z-Math.cos(P.yaw)*2.2);u.uLampI.value=(1-dl)*1.0;
   water.position.set(P.x,0,P.z);
@@ -1605,19 +1829,21 @@ function update(dt){
   const st=G.state;
   if(st==='playing')G.t+=dt;
   if(st==='intro')G.ti+=dt;
+  if(st==='lost')G.lostT+=dt;
   const t=G.t;
   const run=st==='playing'||st==='won'||st==='lost'||st==='paused';
+  env.run=run;
   if(st==='menu')RUN_Z0=P.z;
   env.p=run?progressAt(P.z):0;
   if(run&&env.p>0.25)worldDirty=true;
   const p=env.p;
   let rainT;
   if(st==='menu')rainT=0.45;else if(st==='intro')rainT=0.3;else if(st==='won')rainT=0.05;
-  else rainT=pw(p,RAINK);
+  else rainT=pw(p,G.mission===2?RAIN2:RAINK);
   env.rain=damp(env.rain,rainT,1.5,dt);
-  env.dl=damp(env.dl,run?pw(p,DL):0.85,1.0,dt);
-  env.warm=damp(env.warm,run?pw(p,WARMK):0,1.0,dt);
-  env.cloud=damp(env.cloud,run?lerp(1,0.35,smooth((p-0.85)/0.15)):1,1.0,dt);
+  env.dl=damp(env.dl,run?pw(p,G.mission===2?DL2:DL):0.85,1.0,dt);
+  env.warm=damp(env.warm,run?pw(p,G.mission===2?WARM2:WARMK):0,1.0,dt);
+  env.cloud=damp(env.cloud,run?(G.mission===2?lerp(0.35,0.15,p):lerp(1,0.35,smooth((p-0.85)/0.15))):1,1.0,dt);
   env.ig=run?igapoAt(p):0;
   for(const k in inp)inp[k]=kb[k]||tc[k];
   inp.axis=clamp((tc.axis||0)+(tilt.on?tilt.axis:0),-1,1);
@@ -1628,9 +1854,14 @@ function update(dt){
   updateCroc(dt);
   updateObstacles(dt);
   updateSnake(dt);
+  updateWhirls(dt);
   updateTrees(dt);
   updatePickups(dt);
   updateLedges(dt);
+  updateKits(dt);
+  updateMission2(dt);
+  updateDock(dt);
+  updateBoarding(dt);
   updateVillage();
   updateFireflies();
   updateMist();
@@ -1642,14 +1873,14 @@ function update(dt){
   SFX.update(env.rain,P.s/CFG.vMax,env.danger,dt,env.bz,env.fall);
   updateDrops(dt);
   if(st==='playing'){
-    const ph=phaseOf(p);
+    const ph=G.mission===2?(G.patient?PH.POLO:PH.BUSCA):phaseOf(p);
     if(ph!==G.phase){G.phase=ph;onPhase(ph);}
     while(G.evt<EVENTS.length&&t>=EVENTS[G.evt][0]){toast(EVENTS[G.evt][1]);G.evt++;}
-    if(p>0.93&&!G.near){G.near=true;toast('As luzes da vila! Falta pouco!');}
-    if(P.z<=zEnd())win();
-    vignEl.style.opacity=env.danger*0.9;
+    if(p>0.93&&!G.near&&(G.mission===1||G.patient)){G.near=true;toast(G.mission===1?'As luzes da comunidade! Falta pouco!':'O Polo Base à vista!');}
+    if(P.z<=zEnd()&&(G.mission===1||G.patient))win();
+    vignEl.style.opacity=Math.max(env.danger*0.9,Math.max(0,P.hurtT)/0.4*0.85,P.hp<30?0.25+0.15*Math.sin(T*6):0);
   }
-  if(G.endDelay>0){G.endDelay-=dt;if(G.endDelay<=0)endScreen(G.state==='won');}
+  if(G.endDelay>0){G.endDelay-=dt;if(G.endDelay<=0){if(G.state==='won'&&G.mission===1)intermission();else endScreen(G.state==='won');}}
   if(st==='lost')vignEl.style.opacity=Math.max(0,parseFloat(vignEl.style.opacity||0)-dt*0.25);
   if(st!=='menu')updateHUD(dt);
 }

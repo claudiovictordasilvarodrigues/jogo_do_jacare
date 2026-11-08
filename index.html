@@ -40,7 +40,7 @@
   <h1>🌧️ FUGA NO AMAZONAS 🐊</h1>
   <p class="tag">“Desça o rio.<br>Não deixe o jacaré alcançar você.”</p>
   <div class="pbar">Jogador: <b id="pName">—</b> <small id="pId"></small> <button id="btnSwitch" class="sbtn">Trocar</button></div>
-  <p class="story">Sua filha está com febre e o remédio só chega pelo rio, até a Vila Boa Esperança. A tempestade fechou a estrada — e um jacaré-açu faminto segue a sua canoa.</p>
+  <p class="story">Você é <b>técnico de enfermagem</b> da equipe de saúde ribeirinha e indígena. <b>Missão 1:</b> levar o remédio a uma criança com febre alta. <b>Missão 2:</b> buscar uma anciã em outra aldeia e levá-la ao Polo Base para avaliação médica. A tempestade fechou a estrada — e um jacaré-açu faminto segue a sua canoa.</p>
   <div id="lastScore" class="score"><span class="lbl">ÚLTIMA PONTUAÇÃO</span><b id="scoreVal">--</b><small id="scoreNote">Ainda sem registro</small><br><small id="bestNote"></small></div>
   <button id="btnStart" class="big">INICIAR</button>
   <button id="btnHow" class="big alt">COMO JOGAR</button>
@@ -49,15 +49,12 @@
   <div class="gfx"><button class="sbtn m-gfx"></button></div>
   <p id="rotateHint">📱 Dica: gire o celular para a horizontal.</p>
   <div id="how" class="hidden">
-    <b>A história:</b> leve o remédio da sua filha Aninha até a Vila Boa Esperança, rio abaixo, durante uma noite de tempestade — antes que o jacaré alcance você.
+    <b>A história:</b> você é técnico de enfermagem na área indígena e ribeirinha. Missão 1: levar o remédio à criança com febre, numa noite de tempestade. Missão 2: ir à Aldeia Maripá, pegar uma anciã e levá-la ao Polo Base para avaliação médica.
     <ul>
-      <li><b>1 · A Cheia (tarde):</b> troncos, pedras e camalotes travam o canal.</li>
-      <li><b>2 · O Banzeiro (entardecer):</b> ondas fortes jogam a canoa de lado e a sucuri atravessa o rio.</li>
-      <li><b>3 · A Trilha de Pedras (anoitecer):</b> fileiras de pedras com uma passagem e quedas d’água — fique no centro.</li>
-      <li><b>4 · A Mata Caída (noite):</b> a tempestade derruba árvores sobre o rio; contorne pelo lado livre.</li>
-      <li><b>5 · O Igapó (noite):</b> floresta alagada, troncos em pé e névoa densa. Siga a luz do lampião.</li>
-      <li><b>6 · A Seca (amanhecer):</b> o rio encolheu e surgem bancos de areia.</li>
-      <li>Colete 🫐 <b>açaí</b>: devolve fôlego e vale 50 pontos. Pontos = metros + açaí + bônus de chegada.</li>
+      <li><b>Vida:</b> pedras, troncos, cobra, árvore caída e margens machucam a canoa. Com 0% ela naufraga. Pegue 🩹 <b>kits de primeiros socorros</b> (+25).</li>
+      <li><b>1 · A Cheia · 2 · O Encontro das Águas</b> (Negro lento, Solimões rápido e com redemoinhos) · <b>3 · O Banzeiro</b> · <b>4 · A Trilha de Pedras</b> (com quedas d’água) · <b>5 · A Mata Caída</b> · <b>6 · O Igapó</b> · <b>7 · A Seca</b>.</li>
+      <li><b>8 · A Busca na Aldeia:</b> atraque no píer — reduza e pare dentro do círculo dourado. <b>9 · Rumo ao Polo:</b> com a paciente a bordo as batidas doem mais, e o jacaré volta.</li>
+      <li>Colete 🫐 <b>açaí</b>: devolve fôlego e vale 50 pontos.</li>
       <li><kbd>A</kbd>/<kbd>←</kbd> e <kbd>D</kbd>/<kbd>→</kbd> viram; <kbd>W</kbd>/<kbd>↑</kbd> acelera; <kbd>S</kbd>/<kbd>↓</kbd> reduz; <kbd>ESC</kbd> pausa; <kbd>R</kbd> reinicia; <kbd>M</kbd> menu.</li>
       <li><b>Celular:</b> arraste o joystick para virar, FREAR para reduzir. A remada é automática (dá para desligar). Também dá para inclinar o aparelho.</li>
       <li>O jacaré vem de trás: veja o quadro <b>ATRÁS</b>. Acelerar gasta o <b>fôlego</b>.</li>
@@ -79,6 +76,7 @@
   <h2 id="endTitle"></h2>
   <p id="endSub"></p>
   <div id="endScore"></div>
+  <button id="btnNext" class="big hidden">CONTINUAR: MISSÃO 2</button>
   <button id="btnRestart2" class="big">JOGAR NOVAMENTE (R)</button>
   <button id="btnToMenu2" class="big alt">VOLTAR AO MENU</button>
 </div></div>
